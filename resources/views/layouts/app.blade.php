@@ -33,6 +33,252 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="@if(request()->routeIs('home')) landing-page @endif @if(request()->routeIs('dashboard')) dashboard-page @endif @if(request()->routeIs('recognition.history')) history-page @endif @if(request()->routeIs('profile.*') || request()->routeIs('recognition.map') || request()->routeIs('reports.*') || request()->routeIs('training.*') || request()->routeIs('models.comparison') || request()->routeIs('species.show')) feature-page @endif @if(request()->routeIs('admin.*')) admin-page @endif @if(request()->routeIs('login') || request()->routeIs('register')) auth-page @endif @if(request()->routeIs('recognition.create')) scan-page @endif @if(request()->routeIs('recognition.show')) result-page @endif @if(request()->routeIs('crab-chat.index')) chat-page @endif">
+@php
+    $currentRouteName = request()->route()?->getName() ?? 'page';
+    $tutorial = [
+        'key' => $currentRouteName,
+        'title' => 'Page Tutorial',
+        'intro' => 'Use this guide to move through the current mobile screen.',
+        'steps' => [
+            'Review the page heading to confirm where you are.',
+            'Use the main controls in the content area to complete the page task.',
+            'Use the bottom navigation to move between primary pages.',
+        ],
+    ];
+
+    if (request()->routeIs('home')) {
+        $tutorial = [
+            'key' => 'home',
+            'title' => 'Welcome Tutorial',
+            'intro' => 'Start here when you are setting up CrabAI Pro on a phone.',
+            'steps' => [
+                'Create an account or log in to save scans and history.',
+                'Use Install App to add CrabAI Pro to your mobile home screen when the browser supports it.',
+                'After sign-in, use Scan, History, Chat, and More from the bottom navigation.',
+            ],
+        ];
+    } elseif (request()->routeIs('login')) {
+        $tutorial = [
+            'key' => 'login',
+            'title' => 'Login Tutorial',
+            'intro' => 'Sign in to open your saved scan workspace.',
+            'steps' => [
+                'Enter the email address registered for your account.',
+                'Use the eye icon if you need to check the password before submitting.',
+                'Submit the form to continue to your dashboard.',
+            ],
+        ];
+    } elseif (request()->routeIs('register')) {
+        $tutorial = [
+            'key' => 'register',
+            'title' => 'Account Tutorial',
+            'intro' => 'Create an account before saving crab recognition results.',
+            'steps' => [
+                'Enter your name, email address, and password.',
+                'Confirm the password before submitting the form.',
+                'After registration, start a scan or open the chatbot from the mobile navigation.',
+            ],
+        ];
+    } elseif (request()->routeIs('dashboard')) {
+        $tutorial = [
+            'key' => 'dashboard',
+            'title' => 'Dashboard Tutorial',
+            'intro' => 'Use the dashboard as a quick status view of your recognition work.',
+            'steps' => [
+                'Check the summary cards for total scans, successful results, low confidence cases, and species data.',
+                'Use New Scan to start image recognition.',
+                'Open recent results from the activity list or use History for the full archive.',
+            ],
+        ];
+    } elseif (request()->routeIs('recognition.create')) {
+        $tutorial = [
+            'key' => 'recognition-create',
+            'title' => 'Scan Tutorial',
+            'intro' => 'Capture or upload a crab image with enough context for reliable recognition.',
+            'steps' => [
+                'Upload an image or open the camera, then keep the whole crab visible in bright light.',
+                'Attach location with Use Location or rely on photo GPS metadata when available.',
+                'Complete the capture checklist before pressing Analyze Image.',
+            ],
+        ];
+    } elseif (request()->routeIs('recognition.history')) {
+        $tutorial = [
+            'key' => 'recognition-history',
+            'title' => 'History Tutorial',
+            'intro' => 'Use history to review, search, export, or delete recognition records.',
+            'steps' => [
+                'Search by scan, species, status, or date filters.',
+                'Open any row to inspect the recognition result in detail.',
+                'Use CSV or PDF when you need a filtered export of the current list.',
+            ],
+        ];
+    } elseif (request()->routeIs('recognition.show')) {
+        $tutorial = [
+            'key' => 'recognition-show',
+            'title' => 'Result Tutorial',
+            'intro' => 'Review the recognition output before using it for a decision.',
+            'steps' => [
+                'Check the predicted species, confidence, processing time, and model version.',
+                'Review AI consensus, location reliability, and warnings before trusting the result.',
+                'Submit feedback if the result is incorrect or needs review.',
+            ],
+        ];
+    } elseif (request()->routeIs('crab-chat.index')) {
+        $tutorial = [
+            'key' => 'crab-chat',
+            'title' => 'Chat Tutorial',
+            'intro' => 'Ask crab identification and care questions in the chatbot.',
+            'steps' => [
+                'Use a suggested prompt or type a crab-related question.',
+                'Keep questions focused on crab traits, habitat, handling, or recognition guidance.',
+                'Use the bottom navigation to return to scanning or history.',
+            ],
+        ];
+    } elseif (request()->routeIs('profile.*')) {
+        $tutorial = [
+            'key' => 'profile',
+            'title' => 'Profile Tutorial',
+            'intro' => 'Manage your account details and review your scan activity.',
+            'steps' => [
+                'Check the profile stats for scans, recognized records, feedback, and latest activity.',
+                'Update your name or email when needed.',
+                'Enter current and new passwords only when changing your password.',
+            ],
+        ];
+    } elseif (request()->routeIs('recognition.map')) {
+        $tutorial = [
+            'key' => 'recognition-map',
+            'title' => 'Map Tutorial',
+            'intro' => 'Explore located scans and possible crab range overlays.',
+            'steps' => [
+                'Use filters to narrow the map by species, confidence, or scan reference.',
+                'Select map pins to see scan details and open the full result.',
+                'Use range overlays as supporting context, not as proof of species identity.',
+            ],
+        ];
+    } elseif (request()->routeIs('reports.*')) {
+        $tutorial = [
+            'key' => 'reports',
+            'title' => 'Reports Tutorial',
+            'intro' => 'Build filtered scan summaries for export.',
+            'steps' => [
+                'Choose filters for date range, status, species, or confidence.',
+                'Review the summary cards before exporting.',
+                'Use CSV for spreadsheet work or PDF for a formatted report.',
+            ],
+        ];
+    } elseif (request()->routeIs('training.*')) {
+        $tutorial = [
+            'key' => 'training',
+            'title' => 'Training Dataset Tutorial',
+            'intro' => 'Review records that may improve future model training.',
+            'steps' => [
+                'Use the filters to find low-confidence or corrected recognition records.',
+                'Open records that need inspection before including them in training review.',
+                'Export the filtered dataset when preparing offline review or model work.',
+            ],
+        ];
+    } elseif (request()->routeIs('models.comparison')) {
+        $tutorial = [
+            'key' => 'models-comparison',
+            'title' => 'Model Comparison Tutorial',
+            'intro' => 'Compare recognition model behavior across recent scan data.',
+            'steps' => [
+                'Review the top stats for best confidence, fastest model, registry versions, and scope.',
+                'Compare model cards for confidence, speed, and review signals.',
+                'Use the page to decide which model results need admin review.',
+            ],
+        ];
+    } elseif (request()->routeIs('species.show')) {
+        $tutorial = [
+            'key' => 'species-show',
+            'title' => 'Species Detail Tutorial',
+            'intro' => 'Read species reference details alongside related recognition activity.',
+            'steps' => [
+                'Review common name, scientific name, supported status, and scan count.',
+                'Use the detail sections to compare traits, habitat, and range information.',
+                'Open the external reference when you need source material.',
+            ],
+        ];
+    } elseif (request()->routeIs('offline')) {
+        $tutorial = [
+            'key' => 'offline',
+            'title' => 'Offline Tutorial',
+            'intro' => 'Use this screen when the app cannot reach the network or AI service.',
+            'steps' => [
+                'Check your connection before starting a recognition request.',
+                'Cached guidance may remain available while recognition is unavailable.',
+                'Return to Scan when the connection or AI service is reachable again.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.dashboard')) {
+        $tutorial = [
+            'key' => 'admin-dashboard',
+            'title' => 'Admin Dashboard Tutorial',
+            'intro' => 'Use the admin dashboard to monitor recognition operations.',
+            'steps' => [
+                'Review AI service status and operational summary cards.',
+                'Use quick actions for accounts, scan data, species, feedback, and models.',
+                'Open the bottom More menu for secondary admin pages on mobile.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.accounts.*')) {
+        $tutorial = [
+            'key' => 'admin-accounts',
+            'title' => 'Accounts Tutorial',
+            'intro' => 'Manage user and admin account records.',
+            'steps' => [
+                'Search or filter accounts before editing.',
+                'Use Add Account to create a new user or admin account.',
+                'Open Edit to update names, emails, roles, or passwords.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.scans.*')) {
+        $tutorial = [
+            'key' => 'admin-scans',
+            'title' => 'Scan Data Tutorial',
+            'intro' => 'Review and maintain recognition scan records.',
+            'steps' => [
+                'Search or filter scans by reference, user, status, model, or date.',
+                'Open a result for inspection or edit scan metadata from the row actions.',
+                'Export CSV when you need an admin copy of the filtered scan set.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.species.*')) {
+        $tutorial = [
+            'key' => 'admin-species',
+            'title' => 'Species Tutorial',
+            'intro' => 'Maintain the species library used by recognition and reference pages.',
+            'steps' => [
+                'Search species before adding a duplicate record.',
+                'Use Add Species or Edit to manage names, support status, ranges, and references.',
+                'Keep model class mappings aligned with the active AI service.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.feedback.*')) {
+        $tutorial = [
+            'key' => 'admin-feedback',
+            'title' => 'Feedback Tutorial',
+            'intro' => 'Review user feedback on recognition results.',
+            'steps' => [
+                'Filter feedback by status to find pending reviews.',
+                'Compare user correction notes with the original scan result.',
+                'Save review decisions so the record can support future dataset work.',
+            ],
+        ];
+    } elseif (request()->routeIs('admin.models.*')) {
+        $tutorial = [
+            'key' => 'admin-models',
+            'title' => 'Models Tutorial',
+            'intro' => 'Manage model versions and AI service synchronization.',
+            'steps' => [
+                'Check AI service status, threshold, registered versions, and active version.',
+                'Use Sync AI Service before registering or activating model data.',
+                'Activate only the version that should drive future recognition requests.',
+            ],
+        ];
+    }
+@endphp
 <div class="app-frame">
 <aside class="sidebar">
     <a class="brand" href="{{ auth()->check() && auth()->user()->isAdmin() ? route('admin.dashboard') : route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
@@ -73,6 +319,10 @@
     <header class="topbar">
         <a class="brand mobile-brand" href="{{ auth()->check() && auth()->user()->isAdmin() ? route('admin.dashboard') : route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
         <div class="topbar-actions">
+            <button class="ghost-button tutorial-toggle" type="button" data-tutorial-open aria-label="Open page tutorial" aria-controls="pageTutorial" aria-expanded="false">
+                <i data-lucide="info" aria-hidden="true"></i>
+                <span>Tutorial</span>
+            </button>
             <button class="ghost-button theme-toggle" type="button" data-theme-toggle aria-label="Switch to night theme" aria-pressed="false">
                 <i class="theme-icon theme-icon-day" data-lucide="sun" aria-hidden="true"></i>
                 <i class="theme-icon theme-icon-night" data-lucide="moon" aria-hidden="true"></i>
@@ -97,6 +347,28 @@
         @yield('content')
     </main>
 </div>
+</div>
+<div class="tutorial-sheet" id="pageTutorial" data-tutorial-key="{{ $tutorial['key'] }}" hidden>
+    <div class="tutorial-sheet-backdrop" data-tutorial-close></div>
+    <section class="tutorial-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="pageTutorialTitle" aria-describedby="pageTutorialIntro">
+        <div class="tutorial-sheet-grip" aria-hidden="true"></div>
+        <header class="tutorial-sheet-head">
+            <div>
+                <p class="eyebrow">Mobile tutorial</p>
+                <h2 id="pageTutorialTitle">{{ $tutorial['title'] }}</h2>
+            </div>
+            <button class="icon-button" type="button" data-tutorial-close aria-label="Close tutorial"><i data-lucide="x"></i></button>
+        </header>
+        <p class="tutorial-intro" id="pageTutorialIntro">{{ $tutorial['intro'] }}</p>
+        <ol class="tutorial-steps">
+            @foreach($tutorial['steps'] as $step)
+                <li><span>{{ $loop->iteration }}</span><p>{{ $step }}</p></li>
+            @endforeach
+        </ol>
+        <div class="tutorial-actions">
+            <button class="button" type="button" data-tutorial-close>Got it</button>
+        </div>
+    </section>
 </div>
 @auth
 @php

@@ -106,6 +106,9 @@ const chatLog = document.getElementById('chatLog');
 const chatSuggestions = document.getElementById('chatSuggestions');
 const moreSheet = document.getElementById('moreSheet');
 const moreOpenButtons = Array.from(document.querySelectorAll('[data-more-open]'));
+const tutorialSheet = document.getElementById('pageTutorial');
+const tutorialOpenButtons = Array.from(document.querySelectorAll('[data-tutorial-open]'));
+const tutorialMobileQuery = window.matchMedia('(max-width: 640px), (pointer: coarse)');
 const mapBoard = document.querySelector('[data-map-points]');
 const mapGrid = document.getElementById('recognitionMapGrid');
 const fullscreenLoader = document.getElementById('fullscreenLoader');
@@ -221,7 +224,74 @@ function closeAuthModal() {
     document.body.classList.remove('modal-open');
 }
 
+function tutorialStorageKey() {
+    return `crabai-tutorial-seen:${tutorialSheet?.dataset.tutorialKey || window.location.pathname}`;
+}
+
+function wasTutorialSeen() {
+    try {
+        return localStorage.getItem(tutorialStorageKey()) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function rememberTutorialSeen() {
+    try {
+        localStorage.setItem(tutorialStorageKey(), '1');
+    } catch {
+        // The tutorial still closes even when storage is unavailable.
+    }
+}
+
+function openTutorialSheet({ focusClose = true } = {}) {
+    if (!tutorialSheet) return;
+
+    closeMoreSheet();
+    tutorialSheet.hidden = false;
+    document.body.classList.add('tutorial-open');
+    tutorialOpenButtons.forEach((button) => button.setAttribute('aria-expanded', 'true'));
+    createIcons({ icons: { Info, X } });
+
+    if (focusClose) {
+        setTimeout(() => tutorialSheet.querySelector('button[data-tutorial-close]')?.focus(), 30);
+    }
+}
+
+function closeTutorialSheet({ remember = true } = {}) {
+    if (!tutorialSheet) return;
+
+    tutorialSheet.hidden = true;
+    document.body.classList.remove('tutorial-open');
+    tutorialOpenButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+
+    if (remember) {
+        rememberTutorialSeen();
+    }
+}
+
+function maybeShowTutorialOnboarding() {
+    if (!tutorialSheet || !tutorialMobileQuery.matches || wasTutorialSeen()) return;
+
+    setTimeout(() => {
+        if (tutorialSheet.hidden && !wasTutorialSeen()) {
+            openTutorialSheet({ focusClose: false });
+        }
+    }, 450);
+}
+
 document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-tutorial-open]')) {
+        event.preventDefault();
+        openTutorialSheet();
+        return;
+    }
+
+    if (event.target.closest('[data-tutorial-close]')) {
+        closeTutorialSheet();
+        return;
+    }
+
     const trigger = event.target.closest('[data-auth-modal]');
     if (trigger && openAuthModal(trigger.dataset.authModal)) {
         event.preventDefault();
@@ -259,6 +329,10 @@ document.addEventListener('keydown', (event) => {
 
     if (event.key === 'Escape' && moreSheet && !moreSheet.hidden) {
         closeMoreSheet();
+    }
+
+    if (event.key === 'Escape' && tutorialSheet && !tutorialSheet.hidden) {
+        closeTutorialSheet();
     }
 });
 
@@ -343,6 +417,7 @@ window.addEventListener('appinstalled', () => {
 
 window.matchMedia('(display-mode: standalone)').addEventListener?.('change', updateInstallButtonState);
 updateInstallButtonState();
+maybeShowTutorialOnboarding();
 
 async function startCamera() {
     try {
