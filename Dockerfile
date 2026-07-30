@@ -25,10 +25,11 @@ RUN apt-get update \
         libcurl4-openssl-dev \
         libicu-dev \
         libonig-dev \
+        libpq-dev \
         libsqlite3-dev \
         libzip-dev \
         unzip \
-    && docker-php-ext-install bcmath curl intl mbstring opcache pdo_mysql pdo_sqlite zip \
+    && docker-php-ext-install bcmath curl intl mbstring opcache pdo_mysql pdo_pgsql pdo_sqlite zip \
     && a2enmod rewrite headers \
     && sed -ri -e 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/*.conf \
     && sed -ri -e 's!/var/www/!/var/www/html/public!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \

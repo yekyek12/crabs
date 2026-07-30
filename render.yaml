@@ -25,29 +25,27 @@ services:
       - key: LOG_LEVEL
         value: debug
       - key: DB_CONNECTION
-        value: mysql
+        value: pgsql
       - key: DB_HOST
-        fromService:
-          type: pserv
-          name: crabs-mysql
+        fromDatabase:
+          name: crabs-postgres
           property: host
       - key: DB_PORT
-        value: "3306"
+        fromDatabase:
+          name: crabs-postgres
+          property: port
       - key: DB_DATABASE
-        fromService:
-          type: pserv
-          name: crabs-mysql
-          envVarKey: MYSQL_DATABASE
+        fromDatabase:
+          name: crabs-postgres
+          property: database
       - key: DB_USERNAME
-        fromService:
-          type: pserv
-          name: crabs-mysql
-          envVarKey: MYSQL_USER
+        fromDatabase:
+          name: crabs-postgres
+          property: user
       - key: DB_PASSWORD
-        fromService:
-          type: pserv
-          name: crabs-mysql
-          envVarKey: MYSQL_PASSWORD
+        fromDatabase:
+          name: crabs-postgres
+          property: password
       - key: SESSION_DRIVER
         value: database
       - key: SESSION_LIFETIME
@@ -131,23 +129,12 @@ services:
       - key: AI_MODEL_PATH
         value: ""
 
-  - type: pserv
-    name: crabs-mysql
-    runtime: image
-    image:
-      url: docker.io/library/mysql:8.4
-    plan: starter
+databases:
+  - name: crabs-postgres
+    databaseName: crabs
+    user: crabs
+    plan: basic-256mb
     region: singapore
-    disk:
-      name: crabs-mysql-data
-      mountPath: /var/lib/mysql
-      sizeGB: 10
-    envVars:
-      - key: MYSQL_DATABASE
-        value: crabs
-      - key: MYSQL_USER
-        value: crabs
-      - key: MYSQL_PASSWORD
-        generateValue: true
-      - key: MYSQL_ROOT_PASSWORD
-        generateValue: true
+    postgresMajorVersion: "18"
+    diskSizeGB: 1
+    storageAutoscalingEnabled: false

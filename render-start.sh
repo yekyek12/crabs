@@ -65,6 +65,23 @@ if [ "$DB_CONNECTION_NAME" = "mysql" ]; then
     done
 fi
 
+if [ "$DB_CONNECTION_NAME" = "pgsql" ]; then
+    echo "Waiting for PostgreSQL at ${DB_HOST}:${DB_PORT:-5432}..."
+    for attempt in {1..60}; do
+        if php -r 'try { new PDO("pgsql:host=".getenv("DB_HOST").";port=".(getenv("DB_PORT") ?: "5432").";dbname=".getenv("DB_DATABASE"), getenv("DB_USERNAME"), getenv("DB_PASSWORD")); exit(0); } catch (Throwable $e) { exit(1); }'; then
+            echo "PostgreSQL is ready."
+            break
+        fi
+
+        if [ "$attempt" -eq 60 ]; then
+            echo "PostgreSQL did not become ready in time." >&2
+            exit 1
+        fi
+
+        sleep 2
+    done
+fi
+
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear

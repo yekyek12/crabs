@@ -59,7 +59,7 @@ Set `AI_MODEL_PATH` in the FastAPI environment to load a trained Ultralytics YOL
 
 ## Deploy To Render
 
-The included `render.yaml` provisions the Laravel web app, a private FastAPI service, and a private MySQL 8.4 service with persistent storage. See `docs/DEPLOYMENT.md` for the Render Blueprint steps.
+The included `render.yaml` provisions the Laravel web app, a private FastAPI service, and a managed Render PostgreSQL database. See `docs/DEPLOYMENT.md` for the Render Blueprint steps.
 
 ## Added Feature Areas
 
