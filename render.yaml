@@ -70,27 +70,35 @@ services:
           name: crabs-ai-service
           envVarKey: AI_SERVICE_TOKEN
       - key: AI_REQUEST_TIMEOUT
-        value: "60"
+        value: "5"
       - key: AI_HEALTH_TIMEOUT
         value: "12"
+      - key: AI_RETRY_ENABLED
+        value: "false"
       - key: AI_CONFIDENCE_THRESHOLD
         value: "0.60"
       - key: AI_HIGH_CONFIDENCE_THRESHOLD
         value: "0.85"
+      - key: AI_FAST_MODE_ENABLED
+        value: "true"
+      - key: AI_FAST_PROVIDER_ORDER
+        value: gemini
+      - key: AI_FAST_MIN_CONFIDENCE
+        value: "0.60"
       - key: LOCATION_MAX_DEVICE_ACCURACY_METERS
         value: "100"
       - key: AI_CONSENSUS_ENABLED
-        value: "true"
-      - key: AI_REQUIRED_PROVIDER_COUNT
-        value: "6"
-      - key: AI_MIN_PROVIDER_AGREEMENT
-        value: "4"
-      - key: AI_ALLOW_SINGLE_PROVIDER_RESULT
         value: "false"
+      - key: AI_REQUIRED_PROVIDER_COUNT
+        value: "1"
+      - key: AI_MIN_PROVIDER_AGREEMENT
+        value: "1"
+      - key: AI_ALLOW_SINGLE_PROVIDER_RESULT
+        value: "true"
       - key: AI_GLOBAL_DETECTION
         value: "true"
       - key: AI_PROVIDER_ORDER
-        value: gemini,anthropic,groq,openrouter,cohere,wisdomgate
+        value: gemini
       - key: GEMINI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -126,6 +134,8 @@ services:
         value: placeholder-1.0.0
       - key: AI_MODEL_CONFIDENCE_THRESHOLD
         value: "0.60"
+      - key: AI_IMAGE_MAX_EDGE
+        value: "1280"
       - key: AI_MODEL_CLASSES
         value: ""
       - key: AI_MODEL_PATH

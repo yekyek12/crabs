@@ -17,6 +17,10 @@ class CrabRecognitionService
 
     public function predict(UploadedFile $image): array
     {
+        if (filter_var(config('services.ai.fast_mode_enabled', false), FILTER_VALIDATE_BOOLEAN)) {
+            return $this->predictFast($image);
+        }
+
         $results = [];
         $errors = [];
         $consensusEnabled = filter_var(config('services.ai.consensus_enabled', true), FILTER_VALIDATE_BOOLEAN);
@@ -43,6 +47,37 @@ class CrabRecognitionService
         return $this->unknownPayload([], $errors, [
             'No AI recognition provider was available. Try again when the network and provider APIs are reachable.',
         ]);
+    }
+
+    private function predictFast(UploadedFile $image): array
+    {
+        $started = hrtime(true);
+        $results = [];
+        $errors = [];
+        $providers = config('services.ai.fast_provider_order', ['local', 'gemini']);
+
+        foreach ($providers as $provider) {
+            try {
+                $payload = $this->predictWithProvider($image, $provider);
+                $payload['processing_time_ms'] ??= $this->elapsedMilliseconds($started);
+                $results[] = $payload;
+
+                if ($payload['success'] ?? false) {
+                    return $this->withFastReliabilityMetadata($payload, $results, $errors);
+                }
+            } catch (Throwable $e) {
+                report($e);
+                $errors[] = "{$provider}: {$e->getMessage()}";
+            }
+        }
+
+        $payload = $this->unknownPayload($results, $errors, [
+            'Fast scan did not produce a usable crab species identification.',
+        ]);
+        $payload['processing_time_ms'] = $this->elapsedMilliseconds($started);
+        $payload['analysis_mode'] = 'fast_single_provider';
+
+        return $payload;
     }
 
     private function predictWithProvider(UploadedFile $image, string $provider): array
@@ -421,6 +456,48 @@ class CrabRecognitionService
             ->all();
     }
 
+    private function withFastReliabilityMetadata(array $payload, array $results, array $errors): array
+    {
+        $confidence = data_get($payload, 'prediction.confidence');
+        $minConfidence = (float) config('services.ai.fast_min_confidence', config('services.ai.confidence_threshold', 0.60));
+        $warnings = (array) data_get($payload, 'image_quality.warnings', []);
+
+        if ($confidence !== null && (float) $confidence < $minConfidence) {
+            $warnings[] = 'Fast scan confidence is below the configured reliability threshold. Treat this as low-confidence and verify against references.';
+        }
+
+        $payload['analysis_mode'] = 'fast_single_provider';
+        $payload['image_quality']['warnings'] = array_values(array_unique(array_filter($warnings)));
+        $payload['consensus'] = [
+            'provider_count' => count($results) + count($errors),
+            'required_provider_count' => 1,
+            'usable_provider_count' => ($payload['success'] ?? false) ? 1 : 0,
+            'agreement_count' => ($payload['success'] ?? false) ? 1 : 0,
+            'minimum_required' => 1,
+            'provider_coverage_met' => true,
+            'agreement_met' => (bool) ($payload['success'] ?? false),
+            'reliability_label' => 'single-provider fast scan',
+            'selected_class_name' => data_get($payload, 'prediction.class_name'),
+            'provider_errors' => $errors,
+        ];
+        $payload['provider_results'] = array_map(fn (array $result) => [
+            'provider' => data_get($result, 'model.provider'),
+            'model' => data_get($result, 'model.version'),
+            'class_name' => data_get($result, 'prediction.class_name'),
+            'common_name' => data_get($result, 'global_species.common_name'),
+            'scientific_name' => data_get($result, 'global_species.scientific_name'),
+            'confidence' => data_get($result, 'prediction.confidence'),
+            'success' => $result['success'] ?? false,
+        ], $results);
+
+        return $payload;
+    }
+
+    private function elapsedMilliseconds(int $started): int
+    {
+        return (int) round((hrtime(true) - $started) / 1_000_000);
+    }
+
     private function averageConfidence(array $results): float
     {
         $values = array_values(array_filter(array_map(
@@ -452,7 +529,11 @@ class CrabRecognitionService
 
     private function client(): PendingRequest
     {
-        return Http::timeout((int) config('services.ai.timeout', 60))->retry(1, 250)->acceptJson();
+        $request = Http::timeout((int) config('services.ai.timeout', 60))->acceptJson();
+
+        return filter_var(config('services.ai.retry_enabled', true), FILTER_VALIDATE_BOOLEAN)
+            ? $request->retry(1, 250)
+            : $request;
     }
 
     private function json($response): array

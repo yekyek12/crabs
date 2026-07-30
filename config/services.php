@@ -40,13 +40,17 @@ return [
         'token' => env('AI_SERVICE_TOKEN'),
         'timeout' => env('AI_REQUEST_TIMEOUT', 60),
         'health_timeout' => env('AI_HEALTH_TIMEOUT', 12),
+        'retry_enabled' => env('AI_RETRY_ENABLED', true),
         'confidence_threshold' => env('AI_CONFIDENCE_THRESHOLD', 0.60),
         'high_confidence_threshold' => env('AI_HIGH_CONFIDENCE_THRESHOLD', 0.85),
+        'fast_mode_enabled' => env('AI_FAST_MODE_ENABLED', false),
+        'fast_min_confidence' => env('AI_FAST_MIN_CONFIDENCE', env('AI_CONFIDENCE_THRESHOLD', 0.60)),
         'consensus_enabled' => env('AI_CONSENSUS_ENABLED', true),
         'required_provider_count' => env('AI_REQUIRED_PROVIDER_COUNT', 6),
         'min_provider_agreement' => env('AI_MIN_PROVIDER_AGREEMENT', 4),
         'allow_single_provider_result' => env('AI_ALLOW_SINGLE_PROVIDER_RESULT', false),
         'global_detection' => env('AI_GLOBAL_DETECTION', true),
+        'fast_provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_FAST_PROVIDER_ORDER', 'local,gemini'))))),
         'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'gemini,anthropic,groq,openrouter,cohere,wisdomgate'))))),
         'providers' => [
             'gemini' => [

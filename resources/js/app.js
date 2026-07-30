@@ -95,9 +95,9 @@ const autoCaptureCheckItems = Array.from(document.querySelectorAll('input[type="
 const checklistProgress = document.getElementById('checklistProgress');
 const checklistStatus = document.getElementById('checklistStatus');
 const manuallyCheckedCaptureChecks = new Set();
-const ANALYSIS_IMAGE_MAX_EDGE = 1600;
-const ANALYSIS_IMAGE_QUALITY = 0.78;
-const ANALYSIS_IMAGE_SMALL_FILE_BYTES = 900 * 1024;
+const ANALYSIS_IMAGE_MAX_EDGE = 1280;
+const ANALYSIS_IMAGE_QUALITY = 0.72;
+const ANALYSIS_IMAGE_SMALL_FILE_BYTES = 700 * 1024;
 const MAX_DEVICE_LOCATION_ACCURACY_METERS = Math.max(1, Number(scanForm?.dataset.maxLocationAccuracy || 100));
 const chatShell = document.querySelector('.crab-chat');
 const chatForm = document.getElementById('crabChatForm');

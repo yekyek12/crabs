@@ -74,6 +74,7 @@
 @if($consensus)
 <article class="panel result-consensus">
     <h2>AI Reliability</h2>
+    <div class="result-field"><span>Analysis mode</span><strong>{{ data_get($consensus, 'reliability_label', 'AI provider result') }}</strong></div>
     <div class="result-field"><span>Provider agreement</span><strong>{{ data_get($consensus, 'agreement_count', 0) }}/{{ data_get($consensus, 'usable_provider_count', 0) }} usable providers</strong></div>
     <div class="result-field"><span>Required rule</span><strong>At least {{ data_get($consensus, 'minimum_required', 2) }} matching provider result(s)</strong></div>
     <div class="result-field"><span>Provider status</span><strong>{{ count(data_get($consensus, 'provider_errors', [])) }} provider issue(s) during this scan</strong></div>
