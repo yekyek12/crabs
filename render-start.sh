@@ -16,13 +16,16 @@ if [ -n "$DB_URL" ]; then
     esac
 fi
 
-if [ -n "$RENDER" ] && [ "${DB_CONNECTION:-}" = "mysql" ] && { [ -z "${DB_HOST:-}" ] || [ "$DB_HOST" = "127.0.0.1" ] || [ "$DB_HOST" = "localhost" ]; }; then
+DB_CONNECTION_NAME="${DB_CONNECTION:-mysql}"
+
+if [ -n "${RENDER:-${RENDER_EXTERNAL_HOSTNAME:-}}" ] && [ "$DB_CONNECTION_NAME" = "mysql" ] && { [ -z "${DB_HOST:-}" ] || [ "$DB_HOST" = "127.0.0.1" ] || [ "$DB_HOST" = "localhost" ]; }; then
     echo "Render is configured for MySQL on ${DB_HOST:-127.0.0.1}, but no MySQL server runs inside this web service." >&2
     echo "Create/connect a Render PostgreSQL database and set DATABASE_URL, or set DB_CONNECTION=pgsql with DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, and DB_PASSWORD." >&2
     exit 1
 fi
 
-DB_CONNECTION_NAME="${DB_CONNECTION:-sqlite}"
+export DB_CONNECTION="$DB_CONNECTION_NAME"
+echo "Using Laravel database connection: $DB_CONNECTION_NAME"
 
 mkdir -p \
     "${LOCAL_FILESYSTEM_ROOT:-/var/www/html/storage/app/private}" \
