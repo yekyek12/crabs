@@ -2,7 +2,7 @@
 @section('content')
 @php
     $focusedHasGps = $focusedRecord && $focusedRecord->latitude !== null && $focusedRecord->longitude !== null;
-    $mapCountLabel = $focusedRecord ? ($focusedHasGps ? 'Focused scan' : 'Focused range') : $mapStats['filtered_points'].' plotted';
+    $mapCountLabel = $focusedRecord ? ($focusedHasGps ? 'Selected scan' : 'Selected range') : $mapStats['filtered_points'].' plotted';
     $latestLocatedAt = $mapStats['latest_located_at'] ? $mapStats['latest_located_at']->format('M d, Y') : 'N/A';
 @endphp
 <section class="page-head feature-head map-head">
@@ -43,6 +43,7 @@
     <div><i data-lucide="filter"></i><strong>{{ $mapStats['filtered_points'] }}</strong><span>Filtered points</span></div>
     <div><i data-lucide="shield-check"></i><strong>{{ $mapStats['six_provider_reliable_points'] }}</strong><span>AI verified points</span></div>
     <div><i data-lucide="globe-2"></i><strong>{{ $mapStats['global_range_layers'] }}</strong><span>Global ranges</span></div>
+    <div><i data-lucide="map-pin"></i><strong>{{ $mapStats['possible_location_markers'] }}</strong><span>Possible places</span></div>
     <div><i data-lucide="gauge"></i><strong>{{ $mapStats['minimum_provider_agreement'] }}/{{ $mapStats['required_provider_count'] }}</strong><span>AI agreement rule</span></div>
     <div class="@if($mapStats['missing_location_scans'] > 0) warning @endif"><i data-lucide="alert-triangle"></i><strong>{{ $mapStats['missing_location_scans'] }}</strong><span>Missing GPS</span></div>
     <div><i data-lucide="clock-3"></i><strong>{{ $latestLocatedAt }}</strong><span>Latest location</span></div>
@@ -50,11 +51,12 @@
 
 <section class="map-board recognition-map-board" data-map-points='@json($points)' data-range-layers='@json($rangeLayers)'>
     <div class="map-board-head">
-        <span><i data-lucide="globe-2"></i>GPS pins / global ranges</span>
-        <strong>{{ $mapStats['filtered_points'] }} / {{ $mapStats['global_range_layers'] }}</strong>
+        <span><i data-lucide="globe-2"></i>GPS pins / ranges / possible places</span>
+        <strong>{{ $mapStats['filtered_points'] }} / {{ $mapStats['global_range_layers'] }} / {{ $mapStats['possible_location_markers'] }}</strong>
     </div>
     <div class="map-layer-legend">
         <span><b class="scan-pin-key"></b>Exact scan GPS</span>
+        <span><b class="possible-pin-key"></b>Possible place</span>
         <span><b class="range-key"></b>Possible global range</span>
     </div>
     <div class="map-grid" id="recognitionMapGrid" aria-label="Recognition locations map">
@@ -64,8 +66,20 @@
 
 <section class="notice map-range-note">
     <i data-lucide="globe-2"></i>
-    <span>Scan pins show exact saved GPS. Shaded regions show possible global range for the identified species, not proof that the scanned crab came from every place in that range.</span>
+    <span>Red pins show exact saved GPS. Blue pins show possible barangay, municipality, province, city, bay, or coastal examples inside the species range. Shaded regions show possible global range, not proof that the scanned crab came from every place in that range.</span>
 </section>
+
+<div class="map-details-modal" id="mapDetailsModal" hidden>
+    <button class="map-details-backdrop" type="button" aria-label="Close map details" data-map-details-close></button>
+    <section class="map-details-panel" role="dialog" aria-modal="true" aria-labelledby="mapDetailsTitle">
+        <button class="map-details-close" type="button" aria-label="Close map details" data-map-details-close><i data-lucide="x"></i></button>
+        <div class="map-details-head">
+            <p class="eyebrow">Map details</p>
+            <h2 id="mapDetailsTitle">Scan Details</h2>
+        </div>
+        <div class="map-details-body" data-map-details-body></div>
+    </section>
+</div>
 
 <div class="mobile-record-list map-record-list">
     @forelse($records as $record)

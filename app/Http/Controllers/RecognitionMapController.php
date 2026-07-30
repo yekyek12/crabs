@@ -73,6 +73,7 @@ class RecognitionMapController extends Controller
             ->filter()
             ->unique('key')
             ->values();
+        $possibleLocationCount = $this->possibleLocationCount($rangeLayers);
 
         return view('recognition_map.index', [
             'records' => $records,
@@ -84,6 +85,7 @@ class RecognitionMapController extends Controller
                 'filtered_points' => $filteredLocatedScans,
                 'six_provider_reliable_points' => $sixProviderReliablePoints,
                 'global_range_layers' => $rangeLayers->count(),
+                'possible_location_markers' => $possibleLocationCount,
                 'range_source_scans' => $matchingRecords->count(),
                 'required_provider_count' => max(1, (int) config('services.ai.required_provider_count', 6)),
                 'minimum_provider_agreement' => max(1, (int) config('services.ai.min_provider_agreement', 4)),
@@ -135,6 +137,15 @@ class RecognitionMapController extends Controller
     private function hasCoordinates(RecognitionRecord $record): bool
     {
         return $record->latitude !== null && $record->longitude !== null;
+    }
+
+    private function possibleLocationCount($rangeLayers): int
+    {
+        return $rangeLayers
+            ->flatMap(fn (array $layer) => $layer['regions'] ?? [])
+            ->flatMap(fn (array $region) => $region['possible_locations'] ?? [])
+            ->unique(fn (array $location) => ($location['label'] ?? '').'|'.($location['latitude'] ?? '').'|'.($location['longitude'] ?? ''))
+            ->count();
     }
 
     private function locationReliability(RecognitionRecord $record): string

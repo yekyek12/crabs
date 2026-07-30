@@ -111,6 +111,9 @@ const tutorialOpenButtons = Array.from(document.querySelectorAll('[data-tutorial
 const tutorialMobileQuery = window.matchMedia('(max-width: 640px), (pointer: coarse)');
 const mapBoard = document.querySelector('[data-map-points]');
 const mapGrid = document.getElementById('recognitionMapGrid');
+const mapDetailsModal = document.getElementById('mapDetailsModal');
+const mapDetailsTitle = document.getElementById('mapDetailsTitle');
+const mapDetailsBody = mapDetailsModal?.querySelector('[data-map-details-body]');
 const fullscreenLoader = document.getElementById('fullscreenLoader');
 const fullscreenLoaderTitle = fullscreenLoader?.querySelector('[data-loading-title]');
 const fullscreenLoaderDetail = fullscreenLoader?.querySelector('[data-loading-detail]');
@@ -310,6 +313,10 @@ document.addEventListener('click', (event) => {
         closeMoreSheet();
     }
 
+    if (event.target.closest('[data-map-details-close]')) {
+        closeMapDetailsModal();
+    }
+
     const passwordToggle = event.target.closest('[data-password-toggle]');
     if (passwordToggle) {
         const input = passwordToggle.closest('.password-field')?.querySelector('input');
@@ -333,6 +340,10 @@ document.addEventListener('keydown', (event) => {
 
     if (event.key === 'Escape' && tutorialSheet && !tutorialSheet.hidden) {
         closeTutorialSheet();
+    }
+
+    if (event.key === 'Escape' && mapDetailsModal && !mapDetailsModal.hidden) {
+        closeMapDetailsModal();
     }
 });
 
@@ -364,6 +375,25 @@ function closeMoreSheet() {
     moreSheet.hidden = true;
     document.body.classList.remove('more-open');
     moreOpenButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+}
+
+function openMapDetailsModal(content, title = 'Map Details') {
+    if (!mapDetailsModal || !mapDetailsBody || !mapDetailsTitle) return;
+
+    mapDetailsTitle.textContent = title;
+    mapDetailsBody.replaceChildren(content);
+    mapDetailsModal.hidden = false;
+    document.body.classList.add('map-modal-open');
+    createIcons({ icons: { X } });
+    mapDetailsModal.querySelector('[data-map-details-close]')?.focus();
+}
+
+function closeMapDetailsModal() {
+    if (!mapDetailsModal) return;
+
+    mapDetailsModal.hidden = true;
+    document.body.classList.remove('map-modal-open');
+    mapDetailsBody?.replaceChildren();
 }
 
 installAppButton?.addEventListener('click', async () => {
@@ -1360,8 +1390,6 @@ function renderRecognitionMap() {
 
     const bounds = [];
     const rangeBounds = [];
-    let focusedMarker = null;
-    let focusedLatLng = null;
     drawableRangeLayers.forEach((layer, layerIndex) => {
         const color = globalRangeColor(layerIndex);
         layer.regions.forEach((region) => {
@@ -1373,10 +1401,36 @@ function renderRecognitionMap() {
                 fillColor: color,
                 fillOpacity: 0.08,
             })
-                .bindPopup(buildGlobalRangePopup(layer, region))
+                .on('click', () => openMapDetailsModal(
+                    buildGlobalRangeDetails(layer, region),
+                    layer.species || 'Possible Crab Range',
+                ))
                 .addTo(recognitionLeafletMap);
 
             rangeBounds.push(region.bounds[0], region.bounds[1]);
+
+            possibleLocationsForRegion(region).forEach((location) => {
+                const latLng = possibleLocationLatLng(location);
+                if (!latLng) return;
+
+                L.marker(latLng, {
+                    icon: L.divIcon({
+                        className: 'crab-possible-marker',
+                        html: '<span aria-hidden="true"></span>',
+                        iconSize: [24, 34],
+                        iconAnchor: [12, 32],
+                        popupAnchor: [0, -28],
+                    }),
+                    title: location.label || 'Possible crab location',
+                })
+                    .on('click', () => openMapDetailsModal(
+                        buildPossibleLocationDetails(layer, region, location),
+                        location.label || 'Possible Crab Location',
+                    ))
+                    .addTo(recognitionLeafletMap);
+
+                rangeBounds.push(latLng);
+            });
         });
     });
 
@@ -1394,12 +1448,10 @@ function renderRecognitionMap() {
             title: point.species || 'Unknown crab',
         }).addTo(recognitionLeafletMap);
 
-        marker.bindPopup(buildRecognitionMapPopup(point));
-        if (point.focused) {
-            focusedMarker = marker;
-            focusedLatLng = latLng;
-        }
-
+        marker.on('click', () => openMapDetailsModal(
+            buildRecognitionMapDetails(point),
+            point.species || 'Scan Details',
+        ));
         if (Number.isFinite(point.accuracy) && point.accuracy > 0) {
             L.circle(latLng, {
                 radius: point.accuracy,
@@ -1414,13 +1466,11 @@ function renderRecognitionMap() {
         bounds.push(latLng);
     });
 
-    if (focusedMarker && focusedLatLng) {
-        recognitionLeafletMap.setView(focusedLatLng, 16);
-    } else if (bounds.length === 1) {
+    if (bounds.length === 1) {
         if (rangeBounds.length > 0) {
             recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.12), { maxZoom: 8 });
         } else {
-            recognitionLeafletMap.setView(bounds[0], 15);
+            recognitionLeafletMap.setView(bounds[0], 8);
         }
     } else {
         recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.16), { maxZoom: bounds.length > 0 ? (rangeBounds.length > 0 ? 8 : 16) : 5 });
@@ -1445,6 +1495,26 @@ function isValidLeafletBounds(bounds) {
         && Number.isFinite(Number(point[1])));
 }
 
+function possibleLocationsForRegion(region) {
+    return Array.isArray(region.possible_locations) ? region.possible_locations : [];
+}
+
+function possibleLocationLatLng(location) {
+    const latitude = Number(location.latitude);
+    const longitude = Number(location.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    return [latitude, longitude];
+}
+
+function possibleLocationMapUrl(location) {
+    const latLng = possibleLocationLatLng(location);
+    if (!latLng) return null;
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latLng[0].toFixed(7)},${latLng[1].toFixed(7)}`)}`;
+}
+
 function appendPopupRow(container, label, value) {
     if (!value) return;
 
@@ -1457,7 +1527,7 @@ function appendPopupRow(container, label, value) {
     container.appendChild(row);
 }
 
-function buildRecognitionMapPopup(point) {
+function buildRecognitionMapDetails(point) {
     const popup = document.createElement('article');
     popup.className = 'crab-map-popup';
 
@@ -1520,7 +1590,7 @@ function buildRecognitionMapPopup(point) {
     return popup;
 }
 
-function buildGlobalRangePopup(layer, region) {
+function buildGlobalRangeDetails(layer, region) {
     const popup = document.createElement('article');
     popup.className = 'crab-map-popup range-popup';
 
@@ -1531,7 +1601,46 @@ function buildGlobalRangePopup(layer, region) {
     appendPopupRow(popup, 'Scientific name', layer.scientific_name);
     appendPopupRow(popup, 'Region', region.label || layer.label);
     appendPopupRow(popup, 'Range', layer.range_text || layer.label);
+    appendPopupRow(popup, 'Possible places', possibleLocationsForRegion(region).length ? `${possibleLocationsForRegion(region).length} blue marker(s) shown inside this range` : null);
     appendPopupRow(popup, 'Layer type', layer.source === 'ai_range_text' ? 'AI range interpretation' : 'Supported species range');
+
+    return popup;
+}
+
+function buildPossibleLocationDetails(layer, region, location) {
+    const popup = document.createElement('article');
+    popup.className = 'crab-map-popup range-popup possible-location-popup';
+    const latLng = possibleLocationLatLng(location);
+
+    const title = document.createElement('h3');
+    title.textContent = location.label || 'Possible crab location';
+    popup.appendChild(title);
+
+    appendPopupRow(popup, 'Marker type', 'Possible place inside species range');
+    appendPopupRow(popup, 'Species', layer.species || 'Possible crab');
+    appendPopupRow(popup, 'Scientific name', layer.scientific_name);
+    appendPopupRow(popup, 'Place type', location.type);
+    appendPopupRow(popup, 'Admin area', location.admin_area);
+    appendPopupRow(popup, 'Country', location.country);
+    appendPopupRow(popup, 'Region square', region.label || layer.label);
+    appendPopupRow(popup, 'Coordinates', latLng ? `${latLng[0].toFixed(5)}, ${latLng[1].toFixed(5)}` : null);
+    appendPopupRow(popup, 'Reliability', 'Possible habitat/range example, not confirmed scan GPS');
+    appendPopupRow(popup, 'Note', location.note);
+
+    const mapsUrl = possibleLocationMapUrl(location);
+    if (mapsUrl) {
+        const actions = document.createElement('div');
+        actions.className = 'crab-map-popup-actions single-action';
+
+        const link = document.createElement('a');
+        link.href = mapsUrl;
+        link.className = 'crab-map-popup-link muted';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = 'Open possible place';
+        actions.appendChild(link);
+        popup.appendChild(actions);
+    }
 
     return popup;
 }
