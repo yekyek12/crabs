@@ -2,15 +2,11 @@ services:
   - type: web
     name: crabs
     runtime: docker
-    plan: starter
+    plan: free
     region: singapore
     branch: main
     autoDeployTrigger: commit
     healthCheckPath: /
-    disk:
-      name: crabs-persistent-data
-      mountPath: /var/www/html/persist
-      sizeGB: 1
     envVars:
       - key: APP_NAME
         value: Crab Recognition AI
@@ -63,13 +59,10 @@ services:
       - key: PUBLIC_FILESYSTEM_ROOT
         value: /var/www/html/persist/storage/app/public
       - key: AI_SERVICE_URL
-        fromService:
-          type: pserv
-          name: crabs-ai-service
-          property: hostport
+        value: https://crabs-ai-service.onrender.com
       - key: AI_SERVICE_TOKEN
         fromService:
-          type: pserv
+          type: web
           name: crabs-ai-service
           envVarKey: AI_SERVICE_TOKEN
       - key: AI_REQUEST_TIMEOUT
@@ -103,16 +96,17 @@ services:
       - key: WISDOMGATE_API_KEY
         sync: false
 
-  - type: pserv
+  - type: web
     name: crabs-ai-service
     runtime: python
-    plan: starter
+    plan: free
     region: singapore
     branch: main
     rootDir: ai-service
     buildCommand: 'python --version && pip install --upgrade pip setuptools wheel && pip install --only-binary=:all: -r requirements.txt'
     startCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT'
     autoDeployTrigger: commit
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
@@ -133,8 +127,6 @@ databases:
   - name: crabs-postgres
     databaseName: crabs
     user: crabs
-    plan: basic-256mb
+    plan: free
     region: singapore
     postgresMajorVersion: "18"
-    diskSizeGB: 1
-    storageAutoscalingEnabled: false
