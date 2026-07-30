@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -e
 
+if [ -n "$DATABASE_URL" ] && [ -z "$DB_URL" ]; then
+    export DB_URL="$DATABASE_URL"
+fi
+
+if [ -n "$DB_URL" ]; then
+    case "$DB_URL" in
+        postgres://*|postgresql://*)
+            export DB_CONNECTION="pgsql"
+            ;;
+        mysql://*|mariadb://*)
+            export DB_CONNECTION="${DB_CONNECTION:-mysql}"
+            ;;
+    esac
+fi
+
+if [ -n "$RENDER" ] && [ "${DB_CONNECTION:-}" = "mysql" ] && { [ -z "${DB_HOST:-}" ] || [ "$DB_HOST" = "127.0.0.1" ] || [ "$DB_HOST" = "localhost" ]; }; then
+    echo "Render is configured for MySQL on ${DB_HOST:-127.0.0.1}, but no MySQL server runs inside this web service." >&2
+    echo "Create/connect a Render PostgreSQL database and set DATABASE_URL, or set DB_CONNECTION=pgsql with DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, and DB_PASSWORD." >&2
+    exit 1
+fi
+
 DB_CONNECTION_NAME="${DB_CONNECTION:-sqlite}"
 
 mkdir -p \

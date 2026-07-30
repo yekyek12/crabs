@@ -41,6 +41,35 @@ After deployment:
 6. Sync model metadata from Admin > Models after deployment.
 7. Replace placeholder species data before field evaluation.
 
+## Manual Render Web Service
+
+If you choose New > Web Service instead of New > Blueprint, Render ignores `render.yaml` and does not create `crabs-postgres` for you.
+
+Create the database first:
+
+1. In Render, choose New > Postgres.
+2. Use name `crabs-postgres`, database `crabs`, user `crabs`, region `Singapore`, and plan `Free`.
+3. Copy the database Internal Database URL.
+
+Then configure the Laravel web service:
+
+1. Choose New > Web Service.
+2. Select the GitHub repo and branch `main`.
+3. Runtime: Docker.
+4. Add environment variables:
+   - `APP_ENV=production`
+   - `APP_DEBUG=false`
+   - `APP_KEY=` a Laravel app key or any long random string
+   - `DATABASE_URL=` the Render Postgres Internal Database URL
+   - `AI_SERVICE_URL=https://crabs-ai-service.onrender.com`
+   - `AI_SERVICE_TOKEN=` same value used on the FastAPI service
+   - `SESSION_DRIVER=database`
+   - `CACHE_STORE=database`
+   - `QUEUE_CONNECTION=database`
+5. Remove any old MySQL variables from the web service, especially `DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_DATABASE=crabs`, `DB_USERNAME=root`, and `DB_PASSWORD`.
+
+The startup script maps Render's `DATABASE_URL` to Laravel's PostgreSQL connection automatically. If the service still logs `Connection: mysql, Host: 127.0.0.1`, the Render web service still has old MySQL environment variables set.
+
 ## Generic Production Notes
 
 1. Configure HTTPS for the Laravel domain; camera APIs require a secure context outside localhost.
