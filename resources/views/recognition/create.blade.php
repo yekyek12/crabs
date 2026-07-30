@@ -9,11 +9,17 @@
     </div>
 </section>
 <canvas id="snapshot" hidden></canvas>
-<form id="scanForm" class="panel action-panel mobile-action-panel scan-action-card" method="post" action="{{ route('recognition.store') }}" enctype="multipart/form-data">@csrf
+<form id="scanForm" class="panel action-panel mobile-action-panel scan-action-card" method="post" action="{{ route('recognition.store') }}" enctype="multipart/form-data" autocomplete="off">@csrf
     <label class="upload-dropzone" for="imageInput"><i data-lucide="upload"></i><span><strong>Upload crab image</strong><small id="imageInputLabel">JPEG, PNG, or WEBP</small></span></label>
     <input id="imageInput" class="scan-file-input" name="image" type="file" accept="image/jpeg,image/png,image/webp" required>
     <input id="latitudeInput" name="latitude" type="hidden" value="{{ old('latitude') }}">
     <input id="longitudeInput" name="longitude" type="hidden" value="{{ old('longitude') }}">
+    <input id="locationAccuracyInput" name="location_accuracy_meters" type="hidden" value="{{ old('location_accuracy_meters') }}">
+    <input name="capture_checks[]" type="hidden" value="one_crab">
+    <input name="capture_checks[]" type="hidden" value="bright_lighting">
+    <input name="capture_checks[]" type="hidden" value="whole_crab">
+    <input name="capture_checks[]" type="hidden" value="minimal_clutter">
+    <input name="capture_checks[]" type="hidden" value="no_covered_parts">
     <div class="field-grid scan-meta-grid">
         <div class="field-group">
             <label for="locationLabelInput">Location label</label>
@@ -26,7 +32,7 @@
     </div>
     <div class="scan-assist-row">
         <button type="button" id="locateScan" class="button muted small"><i data-lucide="map-pin"></i>Use Location</button>
-        <span id="locationStatus" class="scan-assist-status">Location optional</span>
+        <span id="locationStatus" class="scan-assist-status">GPS required: use device location or GPS-tagged photo</span>
     </div>
     @foreach($errors->all() as $error)<p class="error">{{ $error }}</p>@endforeach
     <div class="actions"><button type="button" id="startCamera" class="button muted"><i data-lucide="camera"></i>Camera</button><button type="button" id="capture" class="button muted"><i data-lucide="sparkles"></i>Capture</button><button id="analyzeButton" class="button analyze-button" type="submit"><span class="button-spinner" aria-hidden="true"></span><i data-lucide="upload"></i><span class="button-label">Analyze Image</span></button></div>
@@ -36,18 +42,4 @@
         <button type="button" class="button muted small" id="syncOfflineQueue"><i data-lucide="refresh-cw"></i>Sync</button>
     </div>
 </form>
-<aside class="panel compact scan-checklist scan-checklist-bottom">
-    <div class="checklist-head">
-        <h2>Capture Checklist</h2>
-        <span id="checklistProgress">0/5 ready</span>
-    </div>
-    <ul class="check-list functional-check-list">
-        <li><label><input class="capture-check" form="scanForm" name="capture_checks[]" type="checkbox" value="one_crab" required><span>One crab inside the frame</span></label></li>
-        <li><label><input class="capture-check" form="scanForm" name="capture_checks[]" type="checkbox" value="bright_lighting" required><span>Bright, even lighting</span></label></li>
-        <li><label><input class="capture-check" form="scanForm" name="capture_checks[]" type="checkbox" value="whole_crab" required><span>Whole crab visible</span></label></li>
-        <li><label><input class="capture-check" form="scanForm" name="capture_checks[]" type="checkbox" value="minimal_clutter" required><span>Minimal clutter</span></label></li>
-        <li><label><input class="capture-check" form="scanForm" name="capture_checks[]" type="checkbox" value="no_covered_parts" required><span>No covered body parts</span></label></li>
-    </ul>
-    <p class="checklist-status" id="checklistStatus">Select or capture an image, then complete all checks.</p>
-</aside>
 @endsection

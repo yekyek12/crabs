@@ -12,6 +12,8 @@ The Blueprint creates:
 
 All three resources use Render's free tier in `render.yaml`.
 
+Database data is stored in the managed `crabs-postgres` database, not in the web service container. Normal web service deploys run migrations only for schema changes and keep existing rows. The default demo/reference seeder is guarded: it seeds an empty database, then skips future deploys when users, crab species, or model versions already exist. Set `FORCE_DEFAULT_SEEDER=true` only when you intentionally want to reapply those defaults.
+
 Deploy steps:
 
 1. Commit and push the repository to GitHub.
@@ -34,12 +36,14 @@ Free-tier limits:
 After deployment:
 
 1. Open the Laravel service URL.
-2. Check the deploy logs for `PostgreSQL is ready.`, successful migrations, and cache creation.
-3. Change or remove the seeded demo accounts before public use.
-4. Export important data before the free PostgreSQL expiry, or upgrade the database plan for persistence.
-5. Configure `AI_MODEL_PATH`, `AI_MODEL_NAME`, `AI_MODEL_VERSION`, `AI_MODEL_CONFIDENCE_THRESHOLD`, and `AI_MODEL_CLASSES` on the FastAPI service when a trained model is available.
-6. Sync model metadata from Admin > Models after deployment.
-7. Replace placeholder species data before field evaluation.
+2. Open `/health` on the Laravel service URL and confirm it returns `{"status":"ok","database":"ok"}`.
+3. Check the deploy logs for `PostgreSQL is ready.`, successful migrations, and cache creation.
+4. Register a new user, redeploy the Laravel service, and confirm the user can still log in after the deploy.
+5. Change or remove the seeded demo accounts before public use.
+6. Export important data before the free PostgreSQL expiry, or upgrade the database plan for persistence.
+7. Configure `AI_MODEL_PATH`, `AI_MODEL_NAME`, `AI_MODEL_VERSION`, `AI_MODEL_CONFIDENCE_THRESHOLD`, and `AI_MODEL_CLASSES` on the FastAPI service when a trained model is available.
+8. Sync model metadata from Admin > Models after deployment.
+9. Replace placeholder species data before field evaluation.
 
 ## Manual Render Web Service
 
@@ -66,9 +70,12 @@ Then configure the Laravel web service:
    - `SESSION_DRIVER=database`
    - `CACHE_STORE=database`
    - `QUEUE_CONNECTION=database`
+   - `FORCE_DEFAULT_SEEDER=false`
 5. Remove any old MySQL variables from the web service, especially `DB_CONNECTION=mysql`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`, `DB_DATABASE=crabs`, `DB_USERNAME=root`, and `DB_PASSWORD`.
 
 The startup script maps Render's `DATABASE_URL` to Laravel's PostgreSQL connection automatically. If the service still logs `Connection: mysql, Host: 127.0.0.1`, the Render web service still has old MySQL environment variables set.
+
+Do not use `DB_CONNECTION=sqlite` for Render production data unless you also attach durable storage on a paid service. Render's default web service filesystem is recreated on deploys and restarts, so SQLite files and uploaded local files are not durable there.
 
 ## Generic Production Notes
 

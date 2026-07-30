@@ -32,27 +32,30 @@
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="@if(request()->routeIs('home')) landing-page @endif @if(request()->routeIs('dashboard')) dashboard-page @endif @if(request()->routeIs('recognition.history')) history-page @endif @if(request()->routeIs('profile.*') || request()->routeIs('recognition.map') || request()->routeIs('reports.*') || request()->routeIs('training.*') || request()->routeIs('models.comparison') || request()->routeIs('species.show')) feature-page @endif @if(request()->routeIs('login') || request()->routeIs('register')) auth-page @endif @if(request()->routeIs('recognition.create')) scan-page @endif @if(request()->routeIs('recognition.show')) result-page @endif @if(request()->routeIs('crab-chat.index')) chat-page @endif">
+<body class="@if(request()->routeIs('home')) landing-page @endif @if(request()->routeIs('dashboard')) dashboard-page @endif @if(request()->routeIs('recognition.history')) history-page @endif @if(request()->routeIs('profile.*') || request()->routeIs('recognition.map') || request()->routeIs('reports.*') || request()->routeIs('training.*') || request()->routeIs('models.comparison') || request()->routeIs('species.show')) feature-page @endif @if(request()->routeIs('admin.*')) admin-page @endif @if(request()->routeIs('login') || request()->routeIs('register')) auth-page @endif @if(request()->routeIs('recognition.create')) scan-page @endif @if(request()->routeIs('recognition.show')) result-page @endif @if(request()->routeIs('crab-chat.index')) chat-page @endif">
 <div class="app-frame">
 <aside class="sidebar">
-    <a class="brand" href="{{ route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
-    <div class="sidebar-caption">AI recognition workspace</div>
+    <a class="brand" href="{{ auth()->check() && auth()->user()->isAdmin() ? route('admin.dashboard') : route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
+    <div class="sidebar-caption">{{ auth()->check() && auth()->user()->isAdmin() ? 'Operations workspace' : 'AI recognition workspace' }}</div>
     <nav class="side-nav">
         @auth
-            <a class="@if(request()->routeIs('dashboard')) active @endif" href="{{ route('dashboard') }}"><i data-lucide="home"></i>Dashboard</a>
-            <a class="@if(request()->routeIs('recognition.create')) active @endif" href="{{ route('recognition.create') }}"><i data-lucide="camera"></i>Scan</a>
-            <a class="@if(request()->routeIs('recognition.history') || request()->routeIs('recognition.show')) active @endif" href="{{ route('recognition.history') }}"><i data-lucide="history"></i>History</a>
-            <a class="@if(request()->routeIs('crab-chat.index')) active @endif" href="{{ route('crab-chat.index') }}"><i data-lucide="bot"></i>Crab Chatbot</a>
-            <a class="@if(request()->routeIs('profile.*')) active @endif" href="{{ route('profile.edit') }}"><i data-lucide="user-round"></i>Profile</a>
-            <a class="@if(request()->routeIs('recognition.map')) active @endif" href="{{ route('recognition.map') }}"><i data-lucide="map-pin"></i>Map</a>
-            <a class="@if(request()->routeIs('reports.*')) active @endif" href="{{ route('reports.index') }}"><i data-lucide="file-text"></i>Reports</a>
-            <a class="@if(request()->routeIs('training.*')) active @endif" href="{{ route('training.index') }}"><i data-lucide="database"></i>Training</a>
-            <a class="@if(request()->routeIs('models.comparison')) active @endif" href="{{ route('models.comparison') }}"><i data-lucide="bar-chart-3"></i>Compare</a>
             @if(auth()->user()->isAdmin())
                 <a class="@if(request()->routeIs('admin.dashboard')) active @endif" href="{{ route('admin.dashboard') }}"><i data-lucide="bar-chart-3"></i>Admin</a>
+                <a class="@if(request()->routeIs('admin.accounts.*')) active @endif" href="{{ route('admin.accounts.index') }}"><i data-lucide="users"></i>Accounts</a>
+                <a class="@if(request()->routeIs('admin.scans.*')) active @endif" href="{{ route('admin.scans.index') }}"><i data-lucide="scan-search"></i>Scan Data</a>
                 <a class="@if(request()->routeIs('admin.species.*')) active @endif" href="{{ route('admin.species.index') }}"><i data-lucide="database"></i>Species</a>
                 <a class="@if(request()->routeIs('admin.feedback.*')) active @endif" href="{{ route('admin.feedback.index') }}"><i data-lucide="clipboard-check"></i>Feedback</a>
                 <a class="@if(request()->routeIs('admin.models.*')) active @endif" href="{{ route('admin.models.index') }}"><i data-lucide="settings"></i>Models</a>
+            @else
+                <a class="@if(request()->routeIs('dashboard')) active @endif" href="{{ route('dashboard') }}"><i data-lucide="home"></i>Dashboard</a>
+                <a class="@if(request()->routeIs('recognition.create')) active @endif" href="{{ route('recognition.create') }}"><i data-lucide="camera"></i>Scan</a>
+                <a class="@if(request()->routeIs('recognition.history') || request()->routeIs('recognition.show')) active @endif" href="{{ route('recognition.history') }}"><i data-lucide="history"></i>History</a>
+                <a class="@if(request()->routeIs('crab-chat.index')) active @endif" href="{{ route('crab-chat.index') }}"><i data-lucide="bot"></i>Crab Chatbot</a>
+                <a class="@if(request()->routeIs('profile.*')) active @endif" href="{{ route('profile.edit') }}"><i data-lucide="user-round"></i>Profile</a>
+                <a class="@if(request()->routeIs('recognition.map')) active @endif" href="{{ route('recognition.map') }}"><i data-lucide="map-pin"></i>Map</a>
+                <a class="@if(request()->routeIs('reports.*')) active @endif" href="{{ route('reports.index') }}"><i data-lucide="file-text"></i>Reports</a>
+                <a class="@if(request()->routeIs('training.*')) active @endif" href="{{ route('training.index') }}"><i data-lucide="database"></i>Training</a>
+                <a class="@if(request()->routeIs('models.comparison')) active @endif" href="{{ route('models.comparison') }}"><i data-lucide="bar-chart-3"></i>Compare</a>
             @endif
         @else
             <a class="@if(request()->routeIs('home')) active @endif" href="{{ route('home') }}"><i data-lucide="home"></i>Overview</a>
@@ -63,12 +66,12 @@
     </nav>
     <div class="sidebar-note">
         <i data-lucide="shield-check"></i>
-        <span>Private image handling with secured AI API handoff.</span>
+        <span>{{ auth()->check() && auth()->user()->isAdmin() ? 'Admin controls for accounts, scan data, species, feedback, and models.' : 'Private image handling with secured AI API handoff.' }}</span>
     </div>
 </aside>
 <div class="workspace">
     <header class="topbar">
-        <a class="brand mobile-brand" href="{{ route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
+        <a class="brand mobile-brand" href="{{ auth()->check() && auth()->user()->isAdmin() ? route('admin.dashboard') : route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
         <div class="topbar-actions">
             <button class="ghost-button theme-toggle" type="button" data-theme-toggle aria-label="Switch to night theme" aria-pressed="false">
                 <i class="theme-icon theme-icon-day" data-lucide="sun" aria-hidden="true"></i>
@@ -97,21 +100,37 @@
 </div>
 @auth
 @php
-    $moreSpecies = \App\Models\CrabSpecies::where('is_active', true)->orderBy('common_name')->first();
-    $moreItems = [
-        ['label' => 'Profile', 'description' => 'Account, password, and scan summary', 'href' => route('profile.edit'), 'icon' => 'user-round', 'active' => request()->routeIs('profile.*')],
-        ['label' => 'Recognition Map', 'description' => 'Located scans by species and confidence', 'href' => route('recognition.map'), 'icon' => 'map-pin', 'active' => request()->routeIs('recognition.map')],
-        ['label' => 'Reports', 'description' => 'Filtered PDF and CSV summaries', 'href' => route('reports.index'), 'icon' => 'file-text', 'active' => request()->routeIs('reports.*')],
-        ['label' => 'Species Detail', 'description' => 'Full crab profile and related scans', 'href' => $moreSpecies ? route('species.show', $moreSpecies) : route('crab-chat.index'), 'icon' => 'leaf', 'active' => request()->routeIs('species.show')],
-        ['label' => 'Training Dataset', 'description' => 'Low-confidence and corrected scan candidates', 'href' => route('training.index'), 'icon' => 'database', 'active' => request()->routeIs('training.*')],
-        ['label' => 'Model Comparison', 'description' => 'Model version confidence, speed, and review metrics', 'href' => route('models.comparison'), 'icon' => 'bar-chart-3', 'active' => request()->routeIs('models.comparison')],
-    ];
+    $isAdmin = auth()->user()->isAdmin();
+
+    if ($isAdmin) {
+        $moreItems = [
+            ['label' => 'Admin Species', 'description' => 'Species library and model class mapping', 'href' => route('admin.species.index'), 'icon' => 'database', 'active' => request()->routeIs('admin.species.*')],
+            ['label' => 'Model Admin', 'description' => 'Model versions, thresholds, and sync tools', 'href' => route('admin.models.index'), 'icon' => 'settings', 'active' => request()->routeIs('admin.models.*')],
+        ];
+    } else {
+        $moreSpecies = \App\Models\CrabSpecies::where('is_active', true)->orderBy('common_name')->first();
+        $moreItems = [
+            ['label' => 'Profile', 'description' => 'Account, password, and scan summary', 'href' => route('profile.edit'), 'icon' => 'user-round', 'active' => request()->routeIs('profile.*')],
+            ['label' => 'Recognition Map', 'description' => 'Located scans by species and confidence', 'href' => route('recognition.map'), 'icon' => 'map-pin', 'active' => request()->routeIs('recognition.map')],
+            ['label' => 'Reports', 'description' => 'Filtered PDF and CSV summaries', 'href' => route('reports.index'), 'icon' => 'file-text', 'active' => request()->routeIs('reports.*')],
+            ['label' => 'Species Detail', 'description' => 'Full crab profile and related scans', 'href' => $moreSpecies ? route('species.show', $moreSpecies) : route('crab-chat.index'), 'icon' => 'leaf', 'active' => request()->routeIs('species.show')],
+            ['label' => 'Training Dataset', 'description' => 'Low-confidence and corrected scan candidates', 'href' => route('training.index'), 'icon' => 'database', 'active' => request()->routeIs('training.*')],
+            ['label' => 'Model Comparison', 'description' => 'Model version confidence, speed, and review metrics', 'href' => route('models.comparison'), 'icon' => 'bar-chart-3', 'active' => request()->routeIs('models.comparison')],
+        ];
+    }
 @endphp
 <nav class="bottom-nav">
-    <a class="@if(request()->routeIs('dashboard')) active @endif" href="{{ route('dashboard') }}"><i data-lucide="home"></i><span>Home</span></a>
-    <a class="@if(request()->routeIs('recognition.create')) active @endif" href="{{ route('recognition.create') }}"><i data-lucide="camera"></i><span>Scan</span></a>
-    <a class="@if(request()->routeIs('recognition.history') || request()->routeIs('recognition.show')) active @endif" href="{{ route('recognition.history') }}"><i data-lucide="history"></i><span>History</span></a>
-    <a class="@if(request()->routeIs('crab-chat.index')) active @endif" href="{{ route('crab-chat.index') }}"><i data-lucide="bot"></i><span>Chat</span></a>
+    @if($isAdmin)
+        <a class="@if(request()->routeIs('admin.dashboard')) active @endif" href="{{ route('admin.dashboard') }}"><i data-lucide="shield-check"></i><span>Admin</span></a>
+        <a class="@if(request()->routeIs('admin.accounts.*')) active @endif" href="{{ route('admin.accounts.index') }}"><i data-lucide="users"></i><span>Accounts</span></a>
+        <a class="@if(request()->routeIs('admin.scans.*')) active @endif" href="{{ route('admin.scans.index') }}"><i data-lucide="scan-search"></i><span>Scans</span></a>
+        <a class="@if(request()->routeIs('admin.feedback.*')) active @endif" href="{{ route('admin.feedback.index') }}"><i data-lucide="clipboard-check"></i><span>Feedback</span></a>
+    @else
+        <a class="@if(request()->routeIs('dashboard')) active @endif" href="{{ route('dashboard') }}"><i data-lucide="home"></i><span>Home</span></a>
+        <a class="@if(request()->routeIs('recognition.create')) active @endif" href="{{ route('recognition.create') }}"><i data-lucide="camera"></i><span>Scan</span></a>
+        <a class="@if(request()->routeIs('recognition.history') || request()->routeIs('recognition.show')) active @endif" href="{{ route('recognition.history') }}"><i data-lucide="history"></i><span>History</span></a>
+        <a class="@if(request()->routeIs('crab-chat.index')) active @endif" href="{{ route('crab-chat.index') }}"><i data-lucide="bot"></i><span>Chat</span></a>
+    @endif
     <button class="@if(collect($moreItems)->contains('active', true)) active @endif" type="button" data-more-open aria-controls="moreSheet" aria-expanded="false"><i data-lucide="menu"></i><span>More</span></button>
 </nav>
 <div class="more-sheet" id="moreSheet" hidden>
@@ -174,7 +193,7 @@
             <p class="auth-switch">No account yet? <a href="{{ route('register') }}" data-auth-modal="register">Create one</a></p>
         </form>
 
-        <form class="auth-card auth-modal-form" id="registerModalForm" method="post" action="{{ route('register') }}" hidden>@csrf
+        <form class="auth-card auth-modal-form" id="registerModalForm" method="post" action="{{ route('register') }}" data-loading-form data-loading-message="Creating account" data-loading-detail="Submitting your registration and preparing your dashboard." hidden>@csrf
             <div class="auth-card-head">
                 <h2>Create Account</h2>
                 <p>Set up your account to save scans and submit recognition feedback.</p>

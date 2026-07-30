@@ -32,6 +32,9 @@
             }
         }
     }
+    $hasCoordinates = $record->latitude !== null && $record->longitude !== null;
+    $gpsCoordinates = $hasCoordinates ? number_format($record->latitude, 7, '.', '').','.number_format($record->longitude, 7, '.', '') : null;
+    $gpsUrl = $gpsCoordinates ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($gpsCoordinates) : null;
 @endphp
 <section class="page-head app-page-head result-head"><div><p class="eyebrow">{{ $record->scan_reference }}</p><h1>{{ $resultName }}</h1></div><span class="badge"><i data-lucide="gauge"></i>{{ $record->confidence_level }}</span></section>
 <div class="result-media">
@@ -73,7 +76,18 @@
     <div class="result-field"><span>Classification</span><strong>{{ $record->species?->classification ?? $globalSpecies['classification'] ?? $globalSpecies['family'] ?? 'Pending verified species mapping.' }}</strong></div>
     <div class="result-field"><span>Habitat</span><strong>{{ $record->species?->habitat ?? $globalSpecies['habitat'] ?? 'Pending verified project data.' }}</strong></div>
     <div class="result-field"><span>Expert correction</span><strong>{{ $record->expertSpecies?->common_name ?? ($record->needs_retraining ? 'Marked for retraining review' : 'No expert correction recorded.') }}</strong></div>
-    <div class="result-field"><span>Location</span><strong>{{ $record->location_label ?: (($record->latitude && $record->longitude) ? $record->latitude.', '.$record->longitude : 'No location recorded.') }}</strong></div>
+    <div class="result-field"><span>Location</span><strong>{{ $record->location_label ?: ($hasCoordinates ? $record->latitude.', '.$record->longitude : 'No location recorded.') }}</strong></div>
+    @if($hasCoordinates)
+        <div class="result-field"><span>Coordinates</span><strong>{{ number_format($record->latitude, 6) }}, {{ number_format($record->longitude, 6) }}{{ $record->location_accuracy_meters ? ' +/- '.number_format($record->location_accuracy_meters, 0).' m' : '' }}</strong></div>
+        <div class="result-location-actions">
+            <a class="button result-location-button" href="{{ route('recognition.map', ['scan' => $record->scan_reference]) }}">
+                <i data-lucide="map-pin"></i>View on Recognition Map
+            </a>
+            <a class="button muted result-location-button" href="{{ $gpsUrl }}" target="_blank" rel="noopener">
+                <i data-lucide="map-pin"></i>Open GPS Location
+            </a>
+        </div>
+    @endif
     @if($record->capture_notes)<div class="result-field"><span>Capture notes</span><strong>{{ $record->capture_notes }}</strong></div>@endif
     @if(! empty($globalSpecies['visual_characteristics']))
         <div class="result-field"><span>Visual traits</span><strong>{{ $globalSpecies['visual_characteristics'] }}</strong></div>

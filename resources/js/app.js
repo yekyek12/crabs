@@ -1,6 +1,8 @@
-import { createIcons, Activity, AlertTriangle, ArrowRight, BadgeCheck, BarChart3, Bot, Camera, CheckCircle2, ClipboardCheck, Clock3, Database, Download, Eye, EyeOff, ExternalLink, FileSearch, FileText, Filter, Gauge, History, Home, Info, Leaf, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, MessageCircle, Moon, Pencil, Plus, RefreshCw, Save, ScanLine, Search, SendHorizontal, Settings, ShieldAlert, ShieldCheck, Smartphone, Sparkles, Sun, Trash2, Upload, UserPlus, UserRound, Users, WifiOff, X } from 'lucide';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { createIcons, Activity, AlertTriangle, ArrowRight, BadgeCheck, BarChart3, Bot, Camera, CheckCircle2, ClipboardCheck, Clock3, Database, Download, Eye, EyeOff, ExternalLink, FileSearch, FileText, Filter, Gauge, Globe2, History, Home, Info, Leaf, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, MessageCircle, Moon, Pencil, Plus, RefreshCw, Save, ScanLine, Search, SendHorizontal, Settings, ShieldAlert, ShieldCheck, Smartphone, Sparkles, Sun, Trash2, Upload, UserPlus, UserRound, Users, WifiOff, X } from 'lucide';
 
-createIcons({ icons: { Activity, AlertTriangle, ArrowRight, BadgeCheck, BarChart3, Bot, Camera, CheckCircle2, ClipboardCheck, Clock3, Database, Download, Eye, EyeOff, ExternalLink, FileSearch, FileText, Filter, Gauge, History, Home, Info, Leaf, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, MessageCircle, Moon, Pencil, Plus, RefreshCw, Save, ScanLine, Search, SendHorizontal, Settings, ShieldAlert, ShieldCheck, Smartphone, Sparkles, Sun, Trash2, Upload, UserPlus, UserRound, Users, WifiOff, X } });
+createIcons({ icons: { Activity, AlertTriangle, ArrowRight, BadgeCheck, BarChart3, Bot, Camera, CheckCircle2, ClipboardCheck, Clock3, Database, Download, Eye, EyeOff, ExternalLink, FileSearch, FileText, Filter, Gauge, Globe2, History, Home, Info, Leaf, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, MessageCircle, Moon, Pencil, Plus, RefreshCw, Save, ScanLine, Search, SendHorizontal, Settings, ShieldAlert, ShieldCheck, Smartphone, Sparkles, Sun, Trash2, Upload, UserPlus, UserRound, Users, WifiOff, X } });
 
 const themeToggle = document.querySelector('[data-theme-toggle]');
 const themeLabel = themeToggle?.querySelector('[data-theme-label]');
@@ -82,14 +84,17 @@ const analyzeStatus = document.getElementById('analyzeStatus');
 const locateScanButton = document.getElementById('locateScan');
 const latitudeInput = document.getElementById('latitudeInput');
 const longitudeInput = document.getElementById('longitudeInput');
+const locationAccuracyInput = document.getElementById('locationAccuracyInput');
 const locationLabelInput = document.getElementById('locationLabelInput');
 const locationStatus = document.getElementById('locationStatus');
 const offlineQueuePanel = document.getElementById('offlineQueuePanel');
 const offlineQueueCount = document.getElementById('offlineQueueCount');
 const syncOfflineQueueButton = document.getElementById('syncOfflineQueue');
 const checklistItems = Array.from(document.querySelectorAll('.capture-check'));
+const autoCaptureCheckItems = Array.from(document.querySelectorAll('input[type="hidden"][name="capture_checks[]"]'));
 const checklistProgress = document.getElementById('checklistProgress');
 const checklistStatus = document.getElementById('checklistStatus');
+const manuallyCheckedCaptureChecks = new Set();
 const chatShell = document.querySelector('.crab-chat');
 const chatForm = document.getElementById('crabChatForm');
 const chatInput = document.getElementById('crabChatInput');
@@ -103,6 +108,7 @@ const fullscreenLoader = document.getElementById('fullscreenLoader');
 const fullscreenLoaderTitle = fullscreenLoader?.querySelector('[data-loading-title]');
 const fullscreenLoaderDetail = fullscreenLoader?.querySelector('[data-loading-detail]');
 let stream;
+let recognitionLeafletMap;
 
 function showFullscreenLoader(message = 'Please wait', detail = 'Preparing your request.') {
     if (!fullscreenLoader) return;
@@ -357,31 +363,77 @@ function captureImage() {
         const transfer = new DataTransfer();
         transfer.items.add(file);
         input.files = transfer.files;
-        updateCaptureChecklistState();
+        resetCaptureChecklistForNewImage();
     }, 'image/jpeg', 0.86);
+}
+
+function resetCaptureChecklist() {
+    manuallyCheckedCaptureChecks.clear();
+    syncCaptureChecklistDom();
+}
+
+function syncCaptureChecklistDom() {
+    checklistItems.forEach((item) => {
+        const checked = manuallyCheckedCaptureChecks.has(item.value);
+        item.checked = checked;
+        item.defaultChecked = false;
+        if (!checked) {
+            item.removeAttribute('checked');
+        }
+        item.closest('li')?.classList.toggle('is-checked', checked);
+    });
+}
+
+function resetCaptureChecklistForNewImage() {
+    resetCaptureChecklist();
+    updateCaptureChecklistState();
+
+    requestAnimationFrame(() => {
+        resetCaptureChecklist();
+        updateCaptureChecklistState();
+    });
+}
+
+function captureChecklistValuesForSubmission() {
+    if (checklistItems.length === 0) {
+        return autoCaptureCheckItems.map((item) => item.value).filter(Boolean);
+    }
+
+    return checklistItems
+        .filter((item) => manuallyCheckedCaptureChecks.has(item.value))
+        .map((item) => item.value);
+}
+
+function hasScanCoordinates() {
+    if (!latitudeInput || !longitudeInput) return true;
+
+    return latitudeInput.value.trim() !== '' && longitudeInput.value.trim() !== '';
 }
 
 function isScanReady() {
     const hasImage = Boolean(input?.files?.length);
-    const allChecksComplete = checklistItems.length > 0 && checklistItems.every((item) => item.checked);
+    const allChecksComplete = checklistItems.length === 0
+        ? autoCaptureCheckItems.length > 0
+        : checklistItems.every((item) => manuallyCheckedCaptureChecks.has(item.value));
 
     return hasImage && allChecksComplete;
 }
 
 function updateCaptureChecklistState() {
-    if (!scanForm || checklistItems.length === 0) return;
+    if (!scanForm) return;
 
-    const checkedCount = checklistItems.filter((item) => item.checked).length;
+    if (checklistItems.length > 0) {
+        syncCaptureChecklistDom();
+    }
+
+    const checkedCount = checklistItems.filter((item) => manuallyCheckedCaptureChecks.has(item.value)).length;
     const hasImage = Boolean(input?.files?.length);
+    const hasLocation = hasScanCoordinates();
     const ready = isScanReady();
 
     if (imageInputLabel) {
         imageInputLabel.textContent = hasImage ? input.files[0].name : 'JPEG, PNG, or WEBP';
     }
-
-    checklistItems.forEach((item) => {
-        item.closest('li')?.classList.toggle('is-checked', item.checked);
-    });
 
     if (checklistProgress) {
         checklistProgress.textContent = `${checkedCount}/${checklistItems.length} ready`;
@@ -390,7 +442,7 @@ function updateCaptureChecklistState() {
 
     if (checklistStatus) {
         if (ready) {
-            checklistStatus.textContent = 'Ready to analyze.';
+            checklistStatus.textContent = hasLocation ? 'Ready to analyze.' : 'Ready if the uploaded photo has GPS metadata.';
         } else if (!hasImage) {
             checklistStatus.textContent = 'Select or capture an image first.';
         } else {
@@ -401,36 +453,172 @@ function updateCaptureChecklistState() {
 
     if (analyzeButton && !scanForm.classList.contains('is-analyzing')) {
         analyzeButton.disabled = !ready;
-        analyzeButton.querySelector('.button-label').textContent = ready ? 'Analyze Image' : (hasImage ? 'Complete Checklist' : 'Select Image');
+        analyzeButton.querySelector('.button-label').textContent = ready ? 'Analyze Image' : (!hasImage ? 'Select Image' : 'Complete Checklist');
     }
 }
 
-function setLocationStatus(message, ready = false) {
+function setLocationStatus(message, ready = false, warning = false) {
     if (!locationStatus) return;
 
     locationStatus.textContent = message;
     locationStatus.classList.toggle('is-ready', ready);
+    locationStatus.classList.toggle('is-warning', warning);
 }
 
-locateScanButton?.addEventListener('click', () => {
+function formatLocationAccuracy(meters) {
+    const accuracy = Number(meters);
+    if (!Number.isFinite(accuracy) || accuracy <= 0) return null;
+
+    if (accuracy >= 1000) {
+        return `+/- ${(accuracy / 1000).toFixed(1)} km`;
+    }
+
+    return `+/- ${Math.round(accuracy)} m`;
+}
+
+function isSecureLocationContext() {
+    if (window.isSecureContext) return true;
+
+    return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
+function clearLocationInputs() {
+    if (latitudeInput) latitudeInput.value = '';
+    if (longitudeInput) longitudeInput.value = '';
+    if (locationAccuracyInput) locationAccuracyInput.value = '';
+}
+
+async function geolocationPermissionState() {
+    if (!navigator.permissions?.query) return 'prompt';
+
+    try {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        return permission.state;
+    } catch {
+        return 'prompt';
+    }
+}
+
+function currentPosition(options) {
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+}
+
+function watchedPosition(options, timeout = 22000) {
+    return new Promise((resolve, reject) => {
+        let watchId;
+        const timer = window.setTimeout(() => {
+            if (watchId !== undefined) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            reject({ code: 3 });
+        }, timeout);
+
+        watchId = navigator.geolocation.watchPosition((position) => {
+            window.clearTimeout(timer);
+            navigator.geolocation.clearWatch(watchId);
+            resolve(position);
+        }, (error) => {
+            window.clearTimeout(timer);
+            navigator.geolocation.clearWatch(watchId);
+            reject(error);
+        }, options);
+    });
+}
+
+async function bestMobileLocation() {
+    const attempts = [
+        () => currentPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }),
+        () => currentPosition({ enableHighAccuracy: true, timeout: 22000, maximumAge: 0 }),
+        () => watchedPosition({ enableHighAccuracy: true, maximumAge: 0 }, 24000),
+    ];
+    let lastError = null;
+
+    for (const attempt of attempts) {
+        try {
+            return await attempt();
+        } catch (error) {
+            lastError = error;
+            if (error?.code === 1) break;
+        }
+    }
+
+    throw lastError || { code: 2 };
+}
+
+function geolocationErrorMessage(error) {
+    if (error?.code === 1) {
+        return 'Location blocked. Enable site location permission in browser settings.';
+    }
+
+    if (error?.code === 2) {
+        return 'Location unavailable. Turn on device location and try again.';
+    }
+
+    if (error?.code === 3) {
+        return 'Location timed out. Try again with a clearer signal.';
+    }
+
+    return 'Location could not be attached';
+}
+
+function attachScanLocation(position) {
+    const latitude = position.coords.latitude.toFixed(7);
+    const longitude = position.coords.longitude.toFixed(7);
+    const accuracy = Number(position.coords.accuracy);
+    const formattedAccuracy = formatLocationAccuracy(accuracy);
+
+    latitudeInput.value = latitude;
+    longitudeInput.value = longitude;
+    if (locationAccuracyInput) {
+        locationAccuracyInput.value = Number.isFinite(accuracy) ? accuracy.toFixed(2) : '';
+    }
+    if (locationLabelInput && !locationLabelInput.value.trim()) {
+        locationLabelInput.value = formattedAccuracy ? `${latitude}, ${longitude} (${formattedAccuracy})` : `${latitude}, ${longitude}`;
+    }
+
+    setLocationStatus(formattedAccuracy ? `Location attached (${formattedAccuracy})` : 'Location attached', true);
+    updateCaptureChecklistState();
+}
+
+locateScanButton?.addEventListener('click', async () => {
     if (!navigator.geolocation || !latitudeInput || !longitudeInput) {
-        setLocationStatus('Location unavailable');
+        clearLocationInputs();
+        setLocationStatus('Location unavailable on this browser.', false, true);
+        updateCaptureChecklistState();
         return;
     }
 
-    setLocationStatus('Locating...');
-    navigator.geolocation.getCurrentPosition((position) => {
-        const latitude = position.coords.latitude.toFixed(7);
-        const longitude = position.coords.longitude.toFixed(7);
-        latitudeInput.value = latitude;
-        longitudeInput.value = longitude;
-        if (locationLabelInput && !locationLabelInput.value.trim()) {
-            locationLabelInput.value = `${latitude}, ${longitude}`;
+    if (!isSecureLocationContext()) {
+        clearLocationInputs();
+        setLocationStatus('Location needs HTTPS on mobile.', false, true);
+        updateCaptureChecklistState();
+        return;
+    }
+
+    locateScanButton.disabled = true;
+    locateScanButton.setAttribute('aria-busy', 'true');
+
+    try {
+        const permissionState = await geolocationPermissionState();
+        if (permissionState === 'denied') {
+            clearLocationInputs();
+            setLocationStatus('Location blocked. Enable site permission.', false, true);
+            updateCaptureChecklistState();
+            return;
         }
-        setLocationStatus('Location attached', true);
-    }, () => {
-        setLocationStatus('Location permission denied');
-    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+
+        setLocationStatus(permissionState === 'prompt' ? 'Allow location when prompted.' : 'Locating...');
+        attachScanLocation(await bestMobileLocation());
+    } catch (error) {
+        clearLocationInputs();
+        setLocationStatus(geolocationErrorMessage(error), false, true);
+        updateCaptureChecklistState();
+    } finally {
+        locateScanButton.disabled = false;
+        locateScanButton.removeAttribute('aria-busy');
+    }
 });
 
 function queueId() {
@@ -492,10 +680,18 @@ async function updateOfflineQueueUi() {
     try {
         const queued = await allQueuedScans();
         offlineQueueCount.textContent = queued.length;
-        offlineQueuePanel.hidden = queued.length === 0 && navigator.onLine;
-        offlineQueuePanel.classList.toggle('is-offline', !navigator.onLine);
+        offlineQueuePanel.hidden = queued.length === 0;
+        offlineQueuePanel.classList.toggle('is-offline', queued.length > 0 && !navigator.onLine);
+        if (syncOfflineQueueButton) {
+            syncOfflineQueueButton.disabled = queued.length === 0 || !navigator.onLine;
+            syncOfflineQueueButton.toggleAttribute('aria-disabled', syncOfflineQueueButton.disabled);
+        }
     } catch {
         offlineQueuePanel.hidden = true;
+        if (syncOfflineQueueButton) {
+            syncOfflineQueueButton.disabled = true;
+            syncOfflineQueueButton.setAttribute('aria-disabled', 'true');
+        }
     }
 }
 
@@ -514,9 +710,10 @@ async function saveOfflineScan() {
         fields: {
             latitude: latitudeInput?.value || '',
             longitude: longitudeInput?.value || '',
+            location_accuracy_meters: locationAccuracyInput?.value || '',
             location_label: locationLabelInput?.value || '',
             capture_notes: document.getElementById('captureNotesInput')?.value || '',
-            capture_checks: checklistItems.filter((item) => item.checked).map((item) => item.value),
+            capture_checks: captureChecklistValuesForSubmission(),
         },
     };
 
@@ -542,42 +739,64 @@ async function replayQueuedScans() {
         return;
     }
 
-    const queued = await allQueuedScans();
-    for (const record of queued) {
-        const formData = new FormData();
-        formData.append('image', dataUrlToFile(record.dataUrl, record.filename, record.type));
-        Object.entries(record.fields || {}).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                value.forEach((item) => formData.append(`${key}[]`, item));
-                return;
+    syncOfflineQueueButton?.setAttribute('aria-busy', 'true');
+    syncOfflineQueueButton?.setAttribute('disabled', 'disabled');
+
+    try {
+        const queued = await allQueuedScans();
+        for (const record of queued) {
+            const formData = new FormData();
+            formData.append('image', dataUrlToFile(record.dataUrl, record.filename, record.type));
+            Object.entries(record.fields || {}).forEach(([key, value]) => {
+                if (Array.isArray(value)) {
+                    value.forEach((item) => formData.append(`${key}[]`, item));
+                    return;
+                }
+                formData.append(key, value);
+            });
+
+            const response = await fetch(record.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Accept': 'text/html,application/xhtml+xml',
+                },
+                body: formData,
+                credentials: 'same-origin',
+            });
+
+            if (response.ok || response.redirected) {
+                await deleteQueuedScan(record.id);
             }
-            formData.append(key, value);
-        });
-
-        const response = await fetch(record.action, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                'Accept': 'text/html,application/xhtml+xml',
-            },
-            body: formData,
-            credentials: 'same-origin',
-        });
-
-        if (response.ok || response.redirected) {
-            await deleteQueuedScan(record.id);
         }
+    } catch (error) {
+        console.error(error);
+    } finally {
+        syncOfflineQueueButton?.removeAttribute('aria-busy');
+        updateOfflineQueueUi();
     }
-
-    updateOfflineQueueUi();
 }
 
 startButton?.addEventListener('click', startCamera);
 captureButton?.addEventListener('click', captureImage);
-input?.addEventListener('change', updateCaptureChecklistState);
-checklistItems.forEach((item) => item.addEventListener('change', updateCaptureChecklistState));
+input?.addEventListener('change', () => {
+    resetCaptureChecklistForNewImage();
+});
+checklistItems.forEach((item) => item.addEventListener('change', (event) => {
+    if (event.isTrusted && item.checked) {
+        manuallyCheckedCaptureChecks.add(item.value);
+    } else {
+        manuallyCheckedCaptureChecks.delete(item.value);
+    }
+
+    updateCaptureChecklistState();
+}));
+resetCaptureChecklist();
 updateCaptureChecklistState();
 updateOfflineQueueUi();
+window.addEventListener('pageshow', () => {
+    resetCaptureChecklistForNewImage();
+});
 window.addEventListener('online', replayQueuedScans);
 window.addEventListener('offline', updateOfflineQueueUi);
 syncOfflineQueueButton?.addEventListener('click', replayQueuedScans);
@@ -585,7 +804,9 @@ scanForm?.addEventListener('submit', async (event) => {
     if (!isScanReady()) {
         event.preventDefault();
         updateCaptureChecklistState();
-        scanForm.reportValidity();
+        if (!input?.files?.length) {
+            scanForm.reportValidity();
+        }
         return;
     }
 
@@ -594,8 +815,11 @@ scanForm?.addEventListener('submit', async (event) => {
         try {
             await saveOfflineScan();
             scanForm.reset();
-            updateCaptureChecklistState();
-            setLocationStatus('Location optional');
+            if (locationAccuracyInput) {
+                locationAccuracyInput.value = '';
+            }
+            resetCaptureChecklistForNewImage();
+            setLocationStatus('GPS required: use device location or GPS-tagged photo');
             if (analyzeStatus) {
                 analyzeStatus.hidden = false;
                 analyzeStatus.textContent = 'Scan queued for upload when connection returns.';
@@ -722,50 +946,220 @@ function renderRecognitionMap() {
     if (!mapBoard || !mapGrid) return;
 
     let points = [];
+    let rangeLayers = [];
     try {
         points = JSON.parse(mapBoard.dataset.mapPoints || '[]');
     } catch {
         points = [];
     }
+    try {
+        rangeLayers = JSON.parse(mapBoard.dataset.rangeLayers || '[]');
+    } catch {
+        rangeLayers = [];
+    }
 
-    mapGrid.querySelectorAll('.map-marker').forEach((marker) => marker.remove());
-    mapGrid.querySelector('.map-empty-state')?.toggleAttribute('hidden', points.length > 0);
-    if (points.length === 0) return;
+    const validPoints = points
+        .map((point) => ({
+            ...point,
+            latitude: Number(point.latitude),
+            longitude: Number(point.longitude),
+            accuracy: point.accuracy === null || point.accuracy === undefined ? null : Number(point.accuracy),
+        }))
+        .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
 
-    const latitudes = points.map((point) => Number(point.latitude)).filter(Number.isFinite);
-    const longitudes = points.map((point) => Number(point.longitude)).filter(Number.isFinite);
-    const minLat = Math.min(...latitudes);
-    const maxLat = Math.max(...latitudes);
-    const minLng = Math.min(...longitudes);
-    const maxLng = Math.max(...longitudes);
-    const latRange = Math.max(0.0001, maxLat - minLat);
-    const lngRange = Math.max(0.0001, maxLng - minLng);
+    const emptyState = mapGrid.querySelector('.map-empty-state');
+    emptyState?.toggleAttribute('hidden', validPoints.length > 0);
+    mapBoard.classList.toggle('is-empty', validPoints.length === 0);
+    if (validPoints.length === 0) return;
 
-    points.forEach((point) => {
-        const latitude = Number(point.latitude);
-        const longitude = Number(point.longitude);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    if (recognitionLeafletMap) {
+        recognitionLeafletMap.remove();
+    }
 
-        const left = 8 + (((longitude - minLng) / lngRange) * 84);
-        const top = 8 + (((maxLat - latitude) / latRange) * 84);
-        const marker = document.createElement('a');
-        marker.className = `map-marker ${point.level || 'unknown'}`;
-        marker.href = point.url;
-        marker.style.left = `${left}%`;
-        marker.style.top = `${top}%`;
-        const icon = document.createElement('i');
-        icon.dataset.lucide = 'map-pin';
-        const label = document.createElement('span');
-        const title = document.createElement('strong');
-        const detail = document.createElement('small');
-        title.textContent = point.species || 'Unknown crab';
-        detail.textContent = `${point.confidence === null ? 'N/A' : `${point.confidence}%`} - ${point.location || point.reference}`;
-        label.append(title, detail);
-        marker.append(icon, label);
-        mapGrid.appendChild(marker);
+    recognitionLeafletMap = L.map(mapGrid, {
+        scrollWheelZoom: false,
+        tap: true,
+        zoomControl: true,
     });
 
-    createIcons({ icons: { MapPin } });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(recognitionLeafletMap);
+
+    const bounds = [];
+    const rangeBounds = [];
+    let focusedMarker = null;
+    let focusedLatLng = null;
+    rangeLayers.forEach((layer, layerIndex) => {
+        const color = globalRangeColor(layerIndex);
+        (layer.regions || []).forEach((region) => {
+            if (!isValidLeafletBounds(region.bounds)) return;
+
+            L.rectangle(region.bounds, {
+                color,
+                weight: 1.6,
+                opacity: 0.74,
+                dashArray: '7 5',
+                fillColor: color,
+                fillOpacity: 0.08,
+            })
+                .bindPopup(buildGlobalRangePopup(layer, region))
+                .addTo(recognitionLeafletMap);
+
+            rangeBounds.push(region.bounds[0], region.bounds[1]);
+        });
+    });
+
+    validPoints.forEach((point) => {
+        const latLng = [point.latitude, point.longitude];
+        const level = ['high', 'moderate', 'low'].includes(point.level) ? point.level : 'unknown';
+        const color = markerColorForLevel(level);
+        const marker = L.marker(latLng, {
+            icon: L.divIcon({
+                className: `crab-map-marker ${level}${point.focused ? ' is-focused' : ''}${point.ai_consensus?.reliable ? ' ai-verified' : ' ai-review'}`,
+                html: '<span aria-hidden="true"></span>',
+                iconSize: [22, 22],
+                iconAnchor: [11, 11],
+                popupAnchor: [0, -13],
+            }),
+            title: point.species || 'Unknown crab',
+        }).addTo(recognitionLeafletMap);
+
+        marker.bindPopup(buildRecognitionMapPopup(point));
+        if (point.focused) {
+            focusedMarker = marker;
+            focusedLatLng = latLng;
+        }
+
+        if (Number.isFinite(point.accuracy) && point.accuracy > 0) {
+            L.circle(latLng, {
+                radius: point.accuracy,
+                color,
+                weight: 1,
+                opacity: 0.55,
+                fillColor: color,
+                fillOpacity: 0.08,
+            }).addTo(recognitionLeafletMap);
+        }
+
+        bounds.push(latLng);
+    });
+
+    if (focusedMarker && focusedLatLng) {
+        recognitionLeafletMap.setView(focusedLatLng, 16);
+    } else if (bounds.length === 1) {
+        if (rangeBounds.length > 0) {
+            recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.12), { maxZoom: 8 });
+        } else {
+            recognitionLeafletMap.setView(bounds[0], 15);
+        }
+    } else {
+        recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.16), { maxZoom: rangeBounds.length > 0 ? 8 : 16 });
+    }
+
+    mapGrid.classList.add('is-leaflet-ready');
+    window.setTimeout(() => {
+        recognitionLeafletMap?.invalidateSize();
+        focusedMarker?.openPopup();
+    }, 80);
+}
+
+function markerColorForLevel(level) {
+    if (level === 'high') return '#0f766e';
+    if (level === 'moderate') return '#c2410c';
+    if (level === 'low') return '#b91c1c';
+    return '#2563eb';
+}
+
+function globalRangeColor(index) {
+    return ['#2563eb', '#0f766e', '#c2410c', '#7c3aed', '#0e7490', '#be123c'][index % 6];
+}
+
+function isValidLeafletBounds(bounds) {
+    if (!Array.isArray(bounds) || bounds.length !== 2) return false;
+
+    return bounds.every((point) => Array.isArray(point)
+        && point.length === 2
+        && Number.isFinite(Number(point[0]))
+        && Number.isFinite(Number(point[1])));
+}
+
+function appendPopupRow(container, label, value) {
+    if (!value) return;
+
+    const row = document.createElement('p');
+    const rowLabel = document.createElement('span');
+    const rowValue = document.createElement('strong');
+    rowLabel.textContent = label;
+    rowValue.textContent = value;
+    row.append(rowLabel, rowValue);
+    container.appendChild(row);
+}
+
+function buildRecognitionMapPopup(point) {
+    const popup = document.createElement('article');
+    popup.className = 'crab-map-popup';
+
+    const title = document.createElement('h3');
+    title.textContent = point.species || 'Unknown crab';
+    popup.appendChild(title);
+
+    appendPopupRow(popup, 'Scan', point.reference);
+    appendPopupRow(popup, 'Confidence', point.confidence === null || point.confidence === undefined ? 'N/A' : `${point.confidence}% ${point.level || ''}`.trim());
+    appendPopupRow(popup, 'Location', point.location || point.coordinates);
+    appendPopupRow(popup, 'GPS accuracy', formatLocationAccuracy(point.accuracy));
+    if (point.global_range) {
+        appendPopupRow(popup, 'Possible global range', point.global_range.label || point.global_range.range_text);
+    }
+    appendPopupRow(popup, 'Captured', point.date);
+    appendPopupRow(popup, 'Status', point.status ? point.status.replaceAll('_', ' ') : null);
+    if (point.ai_consensus) {
+        appendPopupRow(popup, 'AI reliability', point.ai_consensus.label);
+        appendPopupRow(popup, 'AI coverage', `${point.ai_consensus.provider_count}/${point.ai_consensus.required_provider_count} providers`);
+        appendPopupRow(popup, 'AI agreement', `${point.ai_consensus.agreement_count}/${point.ai_consensus.usable_provider_count} usable, min ${point.ai_consensus.minimum_agreement}`);
+        appendPopupRow(popup, 'AI issues', point.ai_consensus.provider_errors_count > 0 ? `${point.ai_consensus.provider_errors_count} provider issue(s)` : 'None');
+    }
+    appendPopupRow(popup, 'User', point.captured_by);
+
+    const actions = document.createElement('div');
+    actions.className = 'crab-map-popup-actions';
+
+    const link = document.createElement('a');
+    link.href = point.url;
+    link.className = 'crab-map-popup-link';
+    link.textContent = 'Open scan';
+    actions.appendChild(link);
+
+    if (point.maps_url) {
+        const gpsLink = document.createElement('a');
+        gpsLink.href = point.maps_url;
+        gpsLink.className = 'crab-map-popup-link muted';
+        gpsLink.target = '_blank';
+        gpsLink.rel = 'noopener';
+        gpsLink.textContent = 'GPS map';
+        actions.appendChild(gpsLink);
+    }
+
+    popup.appendChild(actions);
+
+    return popup;
+}
+
+function buildGlobalRangePopup(layer, region) {
+    const popup = document.createElement('article');
+    popup.className = 'crab-map-popup range-popup';
+
+    const title = document.createElement('h3');
+    title.textContent = layer.species || 'Possible crab range';
+    popup.appendChild(title);
+
+    appendPopupRow(popup, 'Scientific name', layer.scientific_name);
+    appendPopupRow(popup, 'Region', region.label || layer.label);
+    appendPopupRow(popup, 'Range', layer.range_text || layer.label);
+    appendPopupRow(popup, 'Layer type', layer.source === 'ai_range_text' ? 'AI range interpretation' : 'Supported species range');
+
+    return popup;
 }
 
 renderRecognitionMap();

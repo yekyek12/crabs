@@ -4,11 +4,14 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminCrabSpeciesController;
 use App\Http\Controllers\Admin\AdminFeedbackController;
 use App\Http\Controllers\Admin\AdminModelController;
+use App\Http\Controllers\Admin\AdminAccountController;
+use App\Http\Controllers\Admin\AdminScanDataController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CrabChatController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ModelComparisonController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecognitionController;
@@ -21,6 +24,7 @@ use App\Http\Controllers\TrainingDatasetController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/health', HealthController::class)->name('health');
 Route::redirect('/species', '/crab-chat');
 Route::get('/crab-chat', [CrabChatController::class, 'index'])->name('crab-chat.index');
 Route::post('/crab-chat/message', [CrabChatController::class, 'chat'])->middleware('throttle:20,1')->name('crab-chat.message');
@@ -59,6 +63,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::resource('accounts', AdminAccountController::class)->except(['show', 'destroy']);
+    Route::get('/scans/export/csv', [AdminScanDataController::class, 'export'])->name('scans.export.csv');
+    Route::resource('scans', AdminScanDataController::class)->only(['index', 'edit', 'update', 'destroy']);
     Route::resource('species', AdminCrabSpeciesController::class)->except('show');
     Route::get('/feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
     Route::patch('/feedback/{recognitionFeedback}', [AdminFeedbackController::class, 'update'])->name('feedback.update');

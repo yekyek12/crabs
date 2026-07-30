@@ -19,6 +19,9 @@ class AdminDashboardController extends Controller
 
         return view('admin.dashboard', [
             'users' => User::count(),
+            'activeUsers' => User::where('account_status', 'active')->count(),
+            'suspendedUsers' => User::where('account_status', 'suspended')->count(),
+            'adminUsers' => User::where('role', 'admin')->count(),
             'recognitions' => (clone $recognitions)->count(),
             'today' => RecognitionRecord::whereDate('created_at', today())->count(),
             'month' => RecognitionRecord::whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count(),
@@ -38,6 +41,7 @@ class AdminDashboardController extends Controller
                 ->limit(5)
                 ->get(),
             'recentFeedback' => RecognitionFeedback::with(['recognitionRecord.species', 'user'])->latest()->limit(5)->get(),
+            'recentScans' => RecognitionRecord::with(['user', 'species'])->latest()->limit(5)->get(),
             'aiStatus' => $health->status(),
             'aiStatusDetail' => $health->detail(),
         ]);

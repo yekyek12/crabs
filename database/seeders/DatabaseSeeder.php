@@ -17,6 +17,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $forceDefaultSeeder = filter_var(env('FORCE_DEFAULT_SEEDER', false), FILTER_VALIDATE_BOOLEAN);
+
+        if (! $forceDefaultSeeder && $this->hasExistingSeedData()) {
+            $this->command?->info('Existing database data detected; skipping default seed data. Set FORCE_DEFAULT_SEEDER=true to reapply defaults.');
+
+            return;
+        }
+
         User::updateOrCreate(['email' => 'admin@example.com'], [
             'name' => 'Administrator',
             'password' => 'password',
@@ -170,5 +178,12 @@ class DatabaseSeeder extends Seeder
             'confidence_threshold' => 0.600,
             'is_active' => true,
         ]);
+    }
+
+    private function hasExistingSeedData(): bool
+    {
+        return User::query()->exists()
+            || CrabSpecies::withTrashed()->exists()
+            || ModelVersion::query()->exists();
     }
 }

@@ -227,12 +227,19 @@ class CrabRecognitionService
         $best = reset($groups);
         $usableCount = count($usable);
         $agreementCount = count($best['results']);
-        $minAgreement = max(1, (int) config('services.ai.min_provider_agreement', 2));
-        $allowSingleProvider = filter_var(config('services.ai.allow_single_provider_result', true), FILTER_VALIDATE_BOOLEAN);
+        $providerCount = count($results) + count($errors);
+        $requiredProviderCount = max(1, (int) config('services.ai.required_provider_count', 6));
+        $minAgreement = max(1, (int) config('services.ai.min_provider_agreement', 4));
+        $allowSingleProvider = filter_var(config('services.ai.allow_single_provider_result', false), FILTER_VALIDATE_BOOLEAN);
+        $hasRequiredProviderCoverage = $providerCount >= $requiredProviderCount;
         $hasRequiredAgreement = $agreementCount >= $minAgreement;
         $singleProviderFallback = $usableCount === 1 && $allowSingleProvider;
-        $success = $hasRequiredAgreement || $singleProviderFallback;
+        $success = $hasRequiredProviderCoverage && ($hasRequiredAgreement || $singleProviderFallback);
         $warnings = $this->collectWarnings($results);
+
+        if (! $hasRequiredProviderCoverage) {
+            $warnings[] = "Only {$providerCount} AI provider(s) were attempted. This scan requires {$requiredProviderCount} providers for reliable consensus.";
+        }
 
         if (! $hasRequiredAgreement) {
             $warnings[] = $singleProviderFallback
@@ -273,10 +280,14 @@ class CrabRecognitionService
                 'version' => "{$agreementCount}/{$usableCount} agree",
             ],
             'consensus' => [
-                'provider_count' => count($results) + count($errors),
+                'provider_count' => $providerCount,
+                'required_provider_count' => $requiredProviderCount,
                 'usable_provider_count' => $usableCount,
                 'agreement_count' => $agreementCount,
                 'minimum_required' => $minAgreement,
+                'provider_coverage_met' => $hasRequiredProviderCoverage,
+                'agreement_met' => $hasRequiredAgreement,
+                'reliability_label' => $success ? 'six-provider consensus' : 'needs review',
                 'selected_class_name' => $success ? $best['class_name'] : null,
                 'provider_errors' => $errors,
             ],
@@ -378,9 +389,13 @@ class CrabRecognitionService
             ],
             'consensus' => [
                 'provider_count' => count($results) + count($errors),
+                'required_provider_count' => max(1, (int) config('services.ai.required_provider_count', 6)),
                 'usable_provider_count' => 0,
                 'agreement_count' => 0,
-                'minimum_required' => (int) config('services.ai.min_provider_agreement', 2),
+                'minimum_required' => (int) config('services.ai.min_provider_agreement', 4),
+                'provider_coverage_met' => (count($results) + count($errors)) >= max(1, (int) config('services.ai.required_provider_count', 6)),
+                'agreement_met' => false,
+                'reliability_label' => 'needs review',
                 'selected_class_name' => null,
                 'provider_errors' => $errors,
             ],

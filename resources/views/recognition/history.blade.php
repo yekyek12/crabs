@@ -21,17 +21,23 @@
 </form>
 <div class="list app-list history-list">
     @forelse($records as $record)
+        @php($historyLocation = $record->location_label ?: (($record->latitude !== null && $record->longitude !== null) ? number_format($record->latitude, 5).', '.number_format($record->longitude, 5) : 'Missing GPS metadata'))
         <article class="row history-row">
             <a class="history-row-link" href="{{ route('recognition.show', $record) }}">
                 <span>{{ $record->created_at->format('M d, Y H:i') }}</span>
                 <strong>{{ $record->species?->common_name ?? $record->predicted_class ?? $record->recognition_status }}</strong>
-                <small>{{ $record->confidence ? number_format($record->confidence * 100, 1).'%' : 'N/A' }} | {{ $record->location_label ?: 'No location' }} @if($record->feedback_count) | {{ $record->feedback_count }} feedback @endif</small>
+                <small>{{ $record->confidence ? number_format($record->confidence * 100, 1).'%' : 'N/A' }} | {{ $historyLocation }} @if($record->feedback_count) | {{ $record->feedback_count }} feedback @endif</small>
             </a>
-            <form method="post" action="{{ route('recognition.destroy', $record) }}" onsubmit="return confirm('Delete this recognition record?')">
-                @csrf
-                @method('delete')
-                <button class="icon-button danger" type="submit" aria-label="Delete recognition record"><i data-lucide="trash-2"></i></button>
-            </form>
+            <div class="history-row-actions">
+                @if($record->latitude !== null && $record->longitude !== null)
+                    <a class="icon-button map" href="{{ route('recognition.map', ['scan' => $record->scan_reference]) }}" aria-label="View scan on recognition map"><i data-lucide="map-pin"></i></a>
+                @endif
+                <form method="post" action="{{ route('recognition.destroy', $record) }}" onsubmit="return confirm('Delete this recognition record?')">
+                    @csrf
+                    @method('delete')
+                    <button class="icon-button danger" type="submit" aria-label="Delete recognition record"><i data-lucide="trash-2"></i></button>
+                </form>
+            </div>
         </article>
     @empty
         <div class="empty history-empty">No matching records.</div>

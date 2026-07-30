@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('content')
 <section class="auth-screen">
-    <form class="auth-card" method="post" action="{{ route('register') }}">@csrf
+    <form class="auth-card" method="post" action="{{ route('register') }}" data-loading-form data-loading-message="Creating account" data-loading-detail="Submitting your registration and preparing your dashboard.">@csrf
         <div class="auth-card-head">
             <h2>Create Account</h2>
             <p>Set up your account to save scans and submit recognition feedback.</p>

@@ -6,20 +6,23 @@ use App\Http\Requests\StoreRecognitionRequest;
 use App\Models\CrabSpecies;
 use App\Models\RecognitionRecord;
 use App\Services\CrabRecognitionService;
+use App\Services\ImageLocationService;
 use App\Services\ImageQualityService;
 use App\Services\RecognitionReferenceService;
 use App\Services\RecognitionGuidanceService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class RecognitionController extends Controller
 {
     public function create() { return view('recognition.create'); }
 
-    public function store(StoreRecognitionRequest $request, ImageQualityService $quality, CrabRecognitionService $recognizer)
+    public function store(StoreRecognitionRequest $request, ImageQualityService $quality, CrabRecognitionService $recognizer, ImageLocationService $imageLocation)
     {
         $image = $request->file('image');
+        $location = $this->scanLocation($request, $imageLocation);
         $qualityResult = $quality->assess($image);
         $path = $image->store('recognitions/originals');
         $payload = null; $failure = null;
@@ -63,9 +66,10 @@ class RecognitionController extends Controller
             'model_version' => data_get($payload, 'model.version'),
             'ai_response' => $payload,
             'failure_reason' => $failure,
-            'latitude' => $request->filled('latitude') ? $request->input('latitude') : null,
-            'longitude' => $request->filled('longitude') ? $request->input('longitude') : null,
-            'location_label' => $request->input('location_label'),
+            'latitude' => $location['latitude'],
+            'longitude' => $location['longitude'],
+            'location_accuracy_meters' => $location['accuracy'],
+            'location_label' => $request->input('location_label') ?: $location['label'],
             'capture_notes' => $request->input('capture_notes'),
         ]));
 
@@ -90,8 +94,37 @@ class RecognitionController extends Controller
     public function destroy(RecognitionRecord $recognitionRecord)
     {
         abort_unless($recognitionRecord->user_id === auth()->id(), 403);
-        Storage::delete([$recognitionRecord->original_image_path, $recognitionRecord->annotated_image_path]);
+
+        $paths = collect([$recognitionRecord->original_image_path, $recognitionRecord->annotated_image_path])
+            ->filter()
+            ->all();
+
+        if ($paths !== []) {
+            Storage::delete($paths);
+        }
+
         $recognitionRecord->delete();
         return redirect()->route('recognition.history')->with('status', 'Recognition record deleted.');
+    }
+
+    private function scanLocation(StoreRecognitionRequest $request, ImageLocationService $imageLocation): array
+    {
+        if ($request->filled('latitude') && $request->filled('longitude')) {
+            return [
+                'latitude' => (float) $request->input('latitude'),
+                'longitude' => (float) $request->input('longitude'),
+                'accuracy' => $request->filled('location_accuracy_meters') ? round((float) $request->input('location_accuracy_meters'), 2) : null,
+                'label' => null,
+            ];
+        }
+
+        $metadataLocation = $imageLocation->fromUploadedFile($request->file('image'));
+        if ($metadataLocation !== null) {
+            return $metadataLocation;
+        }
+
+        throw ValidationException::withMessages([
+            'latitude' => 'Attach device GPS location or upload a photo that contains GPS metadata before analysis.',
+        ]);
     }
 }

@@ -6,7 +6,7 @@ services:
     region: singapore
     branch: main
     autoDeployTrigger: commit
-    healthCheckPath: /
+    healthCheckPath: /health
     envVars:
       - key: APP_NAME
         value: Crab Recognition AI
@@ -52,8 +52,12 @@ services:
         value: database
       - key: QUEUE_CONNECTION
         value: database
+      - key: FORCE_DEFAULT_SEEDER
+        value: "false"
       - key: FILESYSTEM_DISK
         value: local
+      # Local storage on Render free web services is still ephemeral.
+      # Use managed Postgres for rows, and object storage or a paid disk for uploaded files.
       - key: LOCAL_FILESYSTEM_ROOT
         value: /var/www/html/persist/storage/app/private
       - key: PUBLIC_FILESYSTEM_ROOT
@@ -75,14 +79,16 @@ services:
         value: "0.85"
       - key: AI_CONSENSUS_ENABLED
         value: "true"
+      - key: AI_REQUIRED_PROVIDER_COUNT
+        value: "6"
       - key: AI_MIN_PROVIDER_AGREEMENT
-        value: "2"
+        value: "4"
       - key: AI_ALLOW_SINGLE_PROVIDER_RESULT
-        value: "true"
+        value: "false"
       - key: AI_GLOBAL_DETECTION
         value: "true"
       - key: AI_PROVIDER_ORDER
-        value: gemini,anthropic,groq,openrouter,cohere,wisdomgate,local
+        value: gemini,anthropic,groq,openrouter,cohere,wisdomgate
       - key: GEMINI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -127,6 +133,8 @@ databases:
   - name: crabs-postgres
     databaseName: crabs
     user: crabs
+    # Free Postgres data persists across normal deploys, but the database expires after 30 days.
+    # Upgrade this plan before storing production data long term.
     plan: free
     region: singapore
     postgresMajorVersion: "18"

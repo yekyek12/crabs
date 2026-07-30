@@ -43,8 +43,9 @@ return [
         'confidence_threshold' => env('AI_CONFIDENCE_THRESHOLD', 0.60),
         'high_confidence_threshold' => env('AI_HIGH_CONFIDENCE_THRESHOLD', 0.85),
         'consensus_enabled' => env('AI_CONSENSUS_ENABLED', true),
-        'min_provider_agreement' => env('AI_MIN_PROVIDER_AGREEMENT', 2),
-        'allow_single_provider_result' => env('AI_ALLOW_SINGLE_PROVIDER_RESULT', true),
+        'required_provider_count' => env('AI_REQUIRED_PROVIDER_COUNT', 6),
+        'min_provider_agreement' => env('AI_MIN_PROVIDER_AGREEMENT', 4),
+        'allow_single_provider_result' => env('AI_ALLOW_SINGLE_PROVIDER_RESULT', false),
         'global_detection' => env('AI_GLOBAL_DETECTION', true),
         'provider_order' => array_values(array_filter(array_map('trim', explode(',', env('AI_PROVIDER_ORDER', 'gemini,anthropic,groq,openrouter,cohere,wisdomgate'))))),
         'providers' => [

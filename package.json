@@ -14,6 +14,7 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "leaflet": "^1.9.4",
         "lucide": "^1.27.0"
     }
 }

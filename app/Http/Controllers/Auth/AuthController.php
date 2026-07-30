@@ -34,7 +34,7 @@ class AuthController extends Controller
         $user = User::create($data + ['role' => 'user', 'account_status' => 'active']);
         Auth::login($user);
         $request->session()->regenerate();
-        return redirect()->route('dashboard');
+        return redirect()->route('dashboard')->with('status', 'Registration successful. Welcome to your dashboard.');
     }
 
     public function login(Request $request)
