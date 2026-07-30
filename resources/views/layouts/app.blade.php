@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="app-base-url" content="{{ url('/') }}">
     <meta name="theme-color" content="#0f766e">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Crab Recognition AI">
@@ -11,12 +12,12 @@
     <meta name="apple-mobile-web-app-title" content="CrabAI">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="msapplication-TileColor" content="#0f766e">
-    <meta name="msapplication-TileImage" content="/pwa-icon-192.png">
+    <meta name="msapplication-TileImage" content="{{ asset('pwa-icon-192.png') }}">
     <meta name="color-scheme" content="light dark">
     <title>{{ $title ?? 'Crab Recognition AI' }}</title>
-    <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/pwa-icon-192.png">
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('pwa-icon-192.png') }}">
     <script>
         (() => {
             let theme = 'day';
@@ -34,7 +35,7 @@
 <body class="@if(request()->routeIs('home')) landing-page @endif @if(request()->routeIs('dashboard')) dashboard-page @endif @if(request()->routeIs('recognition.history')) history-page @endif @if(request()->routeIs('profile.*') || request()->routeIs('recognition.map') || request()->routeIs('reports.*') || request()->routeIs('training.*') || request()->routeIs('models.comparison') || request()->routeIs('species.show')) feature-page @endif @if(request()->routeIs('login') || request()->routeIs('register')) auth-page @endif @if(request()->routeIs('recognition.create')) scan-page @endif @if(request()->routeIs('recognition.show')) result-page @endif @if(request()->routeIs('crab-chat.index')) chat-page @endif">
 <div class="app-frame">
 <aside class="sidebar">
-    <a class="brand" href="{{ route('home') }}"><span class="brand-mark"><img src="/images/crabai-logo.png" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
+    <a class="brand" href="{{ route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
     <div class="sidebar-caption">AI recognition workspace</div>
     <nav class="side-nav">
         @auth
@@ -67,7 +68,7 @@
 </aside>
 <div class="workspace">
     <header class="topbar">
-        <a class="brand mobile-brand" href="{{ route('home') }}"><span class="brand-mark"><img src="/images/crabai-logo.png" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
+        <a class="brand mobile-brand" href="{{ route('home') }}"><span class="brand-mark"><img src="{{ asset('images/crabai-logo.png') }}" alt="CrabAI Pro logo"></span><span>CrabAI Pro</span></a>
         <div class="topbar-actions">
             <button class="ghost-button theme-toggle" type="button" data-theme-toggle aria-label="Switch to night theme" aria-pressed="false">
                 <i class="theme-icon theme-icon-day" data-lucide="sun" aria-hidden="true"></i>

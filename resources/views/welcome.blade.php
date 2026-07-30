@@ -15,7 +15,7 @@
         </div>
     </div>
     <figure class="hero-visual">
-        <img src="/images/crab-hero-saaspro.webp" alt="Crab prepared for AI recognition in a clean modern lab setting">
+        <img src="{{ asset('images/crab-hero-saaspro.webp') }}" alt="Crab prepared for AI recognition in a clean modern lab setting">
         <div class="hero-scan-frame" aria-hidden="true">
             <span></span><span></span><span></span><span></span>
         </div>

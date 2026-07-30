@@ -1,10 +1,10 @@
 {
   "name": "Crab Recognition AI",
   "short_name": "CrabAI",
-  "id": "/",
+  "id": "./",
   "description": "AI-assisted crab species recognition, scan history, species directory, and mobile capture workflow.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "prefer_related_applications": false,
   "orientation": "portrait-primary",
@@ -14,25 +14,25 @@
   "lang": "en",
   "dir": "ltr",
   "icons": [
-    {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
-    {"src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {"src": "pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
   ],
   "shortcuts": [
     {
       "name": "Start Scan",
       "short_name": "Scan",
       "description": "Capture or upload a crab image for recognition.",
-      "url": "/recognition/create?source=pwa-shortcut",
-      "icons": [{"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}]
+      "url": "recognition/create?source=pwa-shortcut",
+      "icons": [{"src": "pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}]
     },
     {
       "name": "Recognition History",
       "short_name": "History",
       "description": "Open saved crab recognition records.",
-      "url": "/history?source=pwa-shortcut",
-      "icons": [{"src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}]
+      "url": "history?source=pwa-shortcut",
+      "icons": [{"src": "pwa-icon-192.png", "sizes": "192x192", "type": "image/png"}]
     }
   ]
 }

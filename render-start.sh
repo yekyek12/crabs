@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 set -e
 
+DB_CONNECTION_NAME="${DB_CONNECTION:-sqlite}"
+
 mkdir -p \
-    "$(dirname "${DB_DATABASE:-/var/www/html/database/database.sqlite}")" \
     "${LOCAL_FILESYSTEM_ROOT:-/var/www/html/storage/app/private}" \
     "${PUBLIC_FILESYSTEM_ROOT:-/var/www/html/storage/app/public}" \
     /var/www/html/storage/framework/cache/data \
     /var/www/html/storage/framework/sessions \
     /var/www/html/storage/framework/views \
     /var/www/html/storage/logs
-touch "${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+
+if [ "$DB_CONNECTION_NAME" = "sqlite" ]; then
+    mkdir -p "$(dirname "${DB_DATABASE:-/var/www/html/database/database.sqlite}")"
+    touch "${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+fi
 
 chown -R www-data:www-data \
-    "$(dirname "${DB_DATABASE:-/var/www/html/database/database.sqlite}")" \
     "${LOCAL_FILESYSTEM_ROOT:-/var/www/html/storage/app/private}" \
     "${PUBLIC_FILESYSTEM_ROOT:-/var/www/html/storage/app/public}" \
     /var/www/html/storage \
     /var/www/html/bootstrap/cache
+
+if [ "$DB_CONNECTION_NAME" = "sqlite" ]; then
+    chown -R www-data:www-data "$(dirname "${DB_DATABASE:-/var/www/html/database/database.sqlite}")"
+fi
 
 if [ -n "$PORT" ]; then
     sed -ri -e "s/^Listen 80$/Listen $PORT/" /etc/apache2/ports.conf
@@ -38,6 +46,23 @@ fi
 
 if [ -n "$AI_SERVICE_URL" ] && [[ "$AI_SERVICE_URL" != http://* ]] && [[ "$AI_SERVICE_URL" != https://* ]]; then
     export AI_SERVICE_URL="http://$AI_SERVICE_URL"
+fi
+
+if [ "$DB_CONNECTION_NAME" = "mysql" ]; then
+    echo "Waiting for MySQL at ${DB_HOST}:${DB_PORT:-3306}..."
+    for attempt in {1..60}; do
+        if php -r 'try { new PDO("mysql:host=".getenv("DB_HOST").";port=".(getenv("DB_PORT") ?: "3306").";dbname=".getenv("DB_DATABASE"), getenv("DB_USERNAME"), getenv("DB_PASSWORD")); exit(0); } catch (Throwable $e) { exit(1); }'; then
+            echo "MySQL is ready."
+            break
+        fi
+
+        if [ "$attempt" -eq 60 ]; then
+            echo "MySQL did not become ready in time." >&2
+            exit 1
+        fi
+
+        sleep 2
+    done
 fi
 
 php artisan config:clear

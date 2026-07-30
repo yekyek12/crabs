@@ -6,6 +6,12 @@ This repository contains the Laravel PWA shell, recognition workflow, private im
 
 ## Install Laravel App
 
+Start Apache and MySQL in XAMPP Control Panel v3.3.0, then create the local database:
+
+```bash
+C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS crabs CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
 ```bash
 composer install
 cp .env.example .env
@@ -17,7 +23,7 @@ php artisan storage:link
 php artisan serve
 ```
 
-Laragon users can run PHP with `C:\laragon\bin\php\php-8.3.29-nts-Win32-vs16-x64\php.exe` if PHP is not on PATH.
+XAMPP users can run PHP with `C:\xampp\php\php.exe` if PHP is not on PATH.
 
 ## Start AI Service
 
@@ -50,6 +56,10 @@ AI_MODEL_CLASSES=
 ```
 
 Set `AI_MODEL_PATH` in the FastAPI environment to load a trained Ultralytics YOLO model. When no model path is configured, the adapter keeps returning the safe placeholder response.
+
+## Deploy To Render
+
+The included `render.yaml` provisions the Laravel web app, a private FastAPI service, and a private MySQL 8.4 service with persistent storage. See `docs/DEPLOYMENT.md` for the Render Blueprint steps.
 
 ## Added Feature Areas
 

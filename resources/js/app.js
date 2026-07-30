@@ -44,7 +44,8 @@ let installPromptWaiters = [];
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        const baseUrl = document.querySelector('meta[name="app-base-url"]')?.content || window.location.origin;
+        navigator.serviceWorker.register(`${baseUrl.replace(/\/$/, '')}/sw.js`)
             .then(() => navigator.serviceWorker.ready)
             .then(() => {
                 serviceWorkerReady = true;

@@ -1,7 +1,13 @@
 @extends('layouts.app')
 @section('content')
+@php
+    $referenceImage = $species->reference_image_path ?: 'images/crab-species-fallback.svg';
+    $referenceImageSrc = \Illuminate\Support\Str::startsWith($referenceImage, ['http://', 'https://'])
+        ? $referenceImage
+        : asset(ltrim($referenceImage, '/'));
+@endphp
 <section class="species-detail-hero">
-    <img src="{{ $species->reference_image_path ?: '/images/crab-species-fallback.svg' }}" alt="{{ $species->common_name }}">
+    <img src="{{ $referenceImageSrc }}" alt="{{ $species->common_name }}">
     <div class="species-detail-copy">
         <p class="eyebrow">Species profile</p>
         <h1>{{ $species->common_name }}</h1>

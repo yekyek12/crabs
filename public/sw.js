@@ -1,5 +1,8 @@
-const CACHE_NAME = 'crabai-shell-v4';
-const SHELL = ['/', '/offline', '/manifest.webmanifest', '/favicon.png', '/pwa-icon-192.png', '/pwa-icon-512.png'];
+const CACHE_NAME = 'crabai-shell-v5';
+const scopeUrl = new URL(self.registration.scope);
+const scopePath = scopeUrl.pathname;
+const scopedUrl = (path) => new URL(path, self.registration.scope).toString();
+const SHELL = ['./', 'offline', 'manifest.webmanifest', 'favicon.png', 'pwa-icon-192.png', 'pwa-icon-512.png'].map(scopedUrl);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
@@ -13,12 +16,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/recognition') || url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/admin')) return;
+  const appPath = url.pathname.startsWith(scopePath) ? `/${url.pathname.slice(scopePath.length)}` : url.pathname;
+  if (event.request.method !== 'GET' || appPath.startsWith('/recognition') || appPath.startsWith('/dashboard') || appPath.startsWith('/admin')) return;
   event.respondWith(fetch(event.request).then((response) => {
     if (response.ok && ['style', 'script', 'image', 'font'].includes(event.request.destination)) {
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
     }
     return response;
-  }).catch(() => caches.match(event.request).then((cached) => cached || caches.match('/offline'))));
+  }).catch(() => caches.match(event.request).then((cached) => cached || caches.match(scopedUrl('offline')))));
 });

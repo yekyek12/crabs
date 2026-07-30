@@ -25,9 +25,29 @@ services:
       - key: LOG_LEVEL
         value: debug
       - key: DB_CONNECTION
-        value: sqlite
+        value: mysql
+      - key: DB_HOST
+        fromService:
+          type: pserv
+          name: crabs-mysql
+          property: host
+      - key: DB_PORT
+        value: "3306"
       - key: DB_DATABASE
-        value: /var/www/html/persist/database/database.sqlite
+        fromService:
+          type: pserv
+          name: crabs-mysql
+          envVarKey: MYSQL_DATABASE
+      - key: DB_USERNAME
+        fromService:
+          type: pserv
+          name: crabs-mysql
+          envVarKey: MYSQL_USER
+      - key: DB_PASSWORD
+        fromService:
+          type: pserv
+          name: crabs-mysql
+          envVarKey: MYSQL_PASSWORD
       - key: SESSION_DRIVER
         value: database
       - key: SESSION_LIFETIME
@@ -46,11 +66,14 @@ services:
         value: /var/www/html/persist/storage/app/public
       - key: AI_SERVICE_URL
         fromService:
-          type: web
+          type: pserv
           name: crabs-ai-service
           property: hostport
       - key: AI_SERVICE_TOKEN
-        value: crabs-ai-token
+        fromService:
+          type: pserv
+          name: crabs-ai-service
+          envVarKey: AI_SERVICE_TOKEN
       - key: AI_REQUEST_TIMEOUT
         value: "60"
       - key: AI_HEALTH_TIMEOUT
@@ -82,22 +105,21 @@ services:
       - key: WISDOMGATE_API_KEY
         sync: false
 
-  - type: web
+  - type: pserv
     name: crabs-ai-service
     runtime: python
-    plan: free
+    plan: starter
     region: singapore
     branch: main
     rootDir: ai-service
-    buildCommand: python --version && pip install --upgrade pip setuptools wheel && pip install --only-binary=:all: -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: 'python --version && pip install --upgrade pip setuptools wheel && pip install --only-binary=:all: -r requirements.txt'
+    startCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT'
     autoDeployTrigger: commit
-    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: AI_SERVICE_TOKEN
-        value: crabs-ai-token
+        generateValue: true
       - key: AI_MODEL_NAME
         value: YOLO Crab Recognition Adapter
       - key: AI_MODEL_VERSION
@@ -108,3 +130,24 @@ services:
         value: ""
       - key: AI_MODEL_PATH
         value: ""
+
+  - type: pserv
+    name: crabs-mysql
+    runtime: image
+    image:
+      url: docker.io/library/mysql:8.4
+    plan: starter
+    region: singapore
+    disk:
+      name: crabs-mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_DATABASE
+        value: crabs
+      - key: MYSQL_USER
+        value: crabs
+      - key: MYSQL_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
