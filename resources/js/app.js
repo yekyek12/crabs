@@ -95,6 +95,10 @@ const autoCaptureCheckItems = Array.from(document.querySelectorAll('input[type="
 const checklistProgress = document.getElementById('checklistProgress');
 const checklistStatus = document.getElementById('checklistStatus');
 const manuallyCheckedCaptureChecks = new Set();
+const ANALYSIS_IMAGE_MAX_EDGE = 1600;
+const ANALYSIS_IMAGE_QUALITY = 0.78;
+const ANALYSIS_IMAGE_SMALL_FILE_BYTES = 900 * 1024;
+const MAX_DEVICE_LOCATION_ACCURACY_METERS = Math.max(1, Number(scanForm?.dataset.maxLocationAccuracy || 100));
 const chatShell = document.querySelector('.crab-chat');
 const chatForm = document.getElementById('crabChatForm');
 const chatInput = document.getElementById('crabChatInput');
@@ -109,6 +113,7 @@ const fullscreenLoaderTitle = fullscreenLoader?.querySelector('[data-loading-tit
 const fullscreenLoaderDetail = fullscreenLoader?.querySelector('[data-loading-detail]');
 let stream;
 let recognitionLeafletMap;
+let scanImagePreparedForSubmit = false;
 
 function showFullscreenLoader(message = 'Please wait', detail = 'Preparing your request.') {
     if (!fullscreenLoader) return;
@@ -355,16 +360,160 @@ function captureImage() {
         alert('Open the camera first or upload an image from your gallery.');
         return;
     }
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
+    const sourceWidth = video.videoWidth || ANALYSIS_IMAGE_MAX_EDGE;
+    const sourceHeight = video.videoHeight || ANALYSIS_IMAGE_MAX_EDGE;
+    const scale = Math.min(1, ANALYSIS_IMAGE_MAX_EDGE / sourceWidth, ANALYSIS_IMAGE_MAX_EDGE / sourceHeight);
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) {
+        alert('The camera image could not be prepared. Please upload an image from your gallery.');
+        return;
+    }
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
         const file = new File([blob], 'crab-capture.jpg', { type: 'image/jpeg' });
         const transfer = new DataTransfer();
         transfer.items.add(file);
         input.files = transfer.files;
+        scanImagePreparedForSubmit = false;
         resetCaptureChecklistForNewImage();
-    }, 'image/jpeg', 0.86);
+    }, 'image/jpeg', ANALYSIS_IMAGE_QUALITY);
+}
+
+function optimizedImageName(file) {
+    const baseName = (file.name || 'crab-scan').replace(/\.[^.]+$/, '');
+
+    return `${baseName}-optimized.jpg`;
+}
+
+function canOptimizeImage(file) {
+    return file && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
+}
+
+function imageSourceSize(source) {
+    return {
+        width: source.width || source.naturalWidth || 0,
+        height: source.height || source.naturalHeight || 0,
+    };
+}
+
+function loadImageElement(file) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(image);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Image could not be prepared for analysis.'));
+        };
+        image.src = url;
+    });
+}
+
+async function decodeImageFile(file) {
+    if ('createImageBitmap' in window) {
+        try {
+            return await createImageBitmap(file, { imageOrientation: 'from-image' });
+        } catch {
+            return loadImageElement(file);
+        }
+    }
+
+    return loadImageElement(file);
+}
+
+function canvasToJpegBlob(canvasElement) {
+    return new Promise((resolve) => {
+        canvasElement.toBlob(resolve, 'image/jpeg', ANALYSIS_IMAGE_QUALITY);
+    });
+}
+
+async function optimizeImageForAnalysis(file, { preserveMetadata = false } = {}) {
+    if (!canOptimizeImage(file) || preserveMetadata) {
+        return file;
+    }
+
+    const source = await decodeImageFile(file);
+    const { width, height } = imageSourceSize(source);
+    if (!width || !height) {
+        source.close?.();
+        return file;
+    }
+
+    const scale = Math.min(1, ANALYSIS_IMAGE_MAX_EDGE / width, ANALYSIS_IMAGE_MAX_EDGE / height);
+    const shouldResize = scale < 1;
+    const shouldRecompress = file.type !== 'image/jpeg' || file.size > ANALYSIS_IMAGE_SMALL_FILE_BYTES;
+    if (!shouldResize && !shouldRecompress) {
+        source.close?.();
+        return file;
+    }
+
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    const workCanvas = document.createElement('canvas');
+    workCanvas.width = targetWidth;
+    workCanvas.height = targetHeight;
+
+    const context = workCanvas.getContext('2d', { alpha: false });
+    if (!context) {
+        source.close?.();
+        return file;
+    }
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, targetWidth, targetHeight);
+    context.drawImage(source, 0, 0, targetWidth, targetHeight);
+    source.close?.();
+
+    const blob = await canvasToJpegBlob(workCanvas);
+    if (!blob || (!shouldResize && blob.size >= file.size * 0.92)) {
+        return file;
+    }
+
+    return new File([blob], optimizedImageName(file), {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+    });
+}
+
+function replaceScanInputFile(file) {
+    try {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        return input.files?.[0] === file || input.files?.[0]?.name === file.name;
+    } catch {
+        return false;
+    }
+}
+
+async function prepareScanImageForSubmit() {
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    const needsPhotoMetadata = !hasScanCoordinates();
+    if (analyzeStatus) {
+        analyzeStatus.hidden = false;
+        analyzeStatus.textContent = needsPhotoMetadata
+            ? 'Keeping photo GPS metadata for validation...'
+            : 'Optimizing image for faster analysis...';
+    }
+
+    const optimizedFile = await optimizeImageForAnalysis(file, { preserveMetadata: needsPhotoMetadata });
+    if (optimizedFile === file) return;
+
+    if (replaceScanInputFile(optimizedFile) && imageInputLabel) {
+        imageInputLabel.textContent = optimizedFile.name;
+    }
 }
 
 function resetCaptureChecklist() {
@@ -407,7 +556,11 @@ function captureChecklistValuesForSubmission() {
 function hasScanCoordinates() {
     if (!latitudeInput || !longitudeInput) return true;
 
-    return latitudeInput.value.trim() !== '' && longitudeInput.value.trim() !== '';
+    if (latitudeInput.value.trim() === '' || longitudeInput.value.trim() === '') return false;
+
+    const accuracy = Number(locationAccuracyInput?.value);
+
+    return Number.isFinite(accuracy) && accuracy > 0 && accuracy <= MAX_DEVICE_LOCATION_ACCURACY_METERS;
 }
 
 function isScanReady() {
@@ -465,6 +618,10 @@ function setLocationStatus(message, ready = false, warning = false) {
     locationStatus.classList.toggle('is-warning', warning);
 }
 
+function preciseLocationRequiredMessage() {
+    return `Precise GPS required: use location within ${Math.round(MAX_DEVICE_LOCATION_ACCURACY_METERS)}m or a GPS-tagged photo`;
+}
+
 function formatLocationAccuracy(meters) {
     const accuracy = Number(meters);
     if (!Number.isFinite(accuracy) || accuracy <= 0) return null;
@@ -508,20 +665,35 @@ function currentPosition(options) {
 function watchedPosition(options, timeout = 22000) {
     return new Promise((resolve, reject) => {
         let watchId;
+        let bestPosition = null;
         const timer = window.setTimeout(() => {
             if (watchId !== undefined) {
                 navigator.geolocation.clearWatch(watchId);
+            }
+            if (bestPosition) {
+                resolve(bestPosition);
+                return;
             }
             reject({ code: 3 });
         }, timeout);
 
         watchId = navigator.geolocation.watchPosition((position) => {
-            window.clearTimeout(timer);
-            navigator.geolocation.clearWatch(watchId);
-            resolve(position);
+            if (!bestPosition || locationAccuracy(position) < locationAccuracy(bestPosition)) {
+                bestPosition = position;
+            }
+
+            if (isReliablePosition(position)) {
+                window.clearTimeout(timer);
+                navigator.geolocation.clearWatch(watchId);
+                resolve(position);
+            }
         }, (error) => {
             window.clearTimeout(timer);
             navigator.geolocation.clearWatch(watchId);
+            if (bestPosition) {
+                resolve(bestPosition);
+                return;
+            }
             reject(error);
         }, options);
     });
@@ -529,25 +701,42 @@ function watchedPosition(options, timeout = 22000) {
 
 async function bestMobileLocation() {
     const attempts = [
-        () => currentPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }),
         () => currentPosition({ enableHighAccuracy: true, timeout: 22000, maximumAge: 0 }),
-        () => watchedPosition({ enableHighAccuracy: true, maximumAge: 0 }, 24000),
+        () => watchedPosition({ enableHighAccuracy: true, maximumAge: 0 }, 30000),
+        () => currentPosition({ enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }),
     ];
     let lastError = null;
+    let bestPosition = null;
 
     for (const attempt of attempts) {
         try {
-            return await attempt();
+            const position = await attempt();
+            if (!bestPosition || locationAccuracy(position) < locationAccuracy(bestPosition)) {
+                bestPosition = position;
+            }
+            if (isReliablePosition(position)) {
+                return position;
+            }
         } catch (error) {
             lastError = error;
             if (error?.code === 1) break;
         }
     }
 
+    if (bestPosition) {
+        throw { code: 'LOW_ACCURACY', accuracy: locationAccuracy(bestPosition) };
+    }
+
     throw lastError || { code: 2 };
 }
 
 function geolocationErrorMessage(error) {
+    if (error?.code === 'LOW_ACCURACY') {
+        const formattedAccuracy = formatLocationAccuracy(error.accuracy);
+
+        return `GPS is too broad${formattedAccuracy ? ` (${formattedAccuracy})` : ''}. Move outdoors and try again.`;
+    }
+
     if (error?.code === 1) {
         return 'Location blocked. Enable site location permission in browser settings.';
     }
@@ -563,11 +752,28 @@ function geolocationErrorMessage(error) {
     return 'Location could not be attached';
 }
 
+function locationAccuracy(position) {
+    const accuracy = Number(position?.coords?.accuracy);
+
+    return Number.isFinite(accuracy) && accuracy > 0 ? accuracy : Number.POSITIVE_INFINITY;
+}
+
+function isReliablePosition(position) {
+    return locationAccuracy(position) <= MAX_DEVICE_LOCATION_ACCURACY_METERS;
+}
+
 function attachScanLocation(position) {
     const latitude = position.coords.latitude.toFixed(7);
     const longitude = position.coords.longitude.toFixed(7);
     const accuracy = Number(position.coords.accuracy);
     const formattedAccuracy = formatLocationAccuracy(accuracy);
+    if (!isReliablePosition(position)) {
+        clearLocationInputs();
+        setLocationStatus(`GPS is too broad${formattedAccuracy ? ` (${formattedAccuracy})` : ''}. Move outdoors and try again.`, false, true);
+        updateCaptureChecklistState();
+
+        return false;
+    }
 
     latitudeInput.value = latitude;
     longitudeInput.value = longitude;
@@ -578,8 +784,10 @@ function attachScanLocation(position) {
         locationLabelInput.value = formattedAccuracy ? `${latitude}, ${longitude} (${formattedAccuracy})` : `${latitude}, ${longitude}`;
     }
 
-    setLocationStatus(formattedAccuracy ? `Location attached (${formattedAccuracy})` : 'Location attached', true);
+    setLocationStatus(formattedAccuracy ? `Reliable GPS attached (${formattedAccuracy})` : 'Reliable GPS attached', true);
     updateCaptureChecklistState();
+
+    return true;
 }
 
 locateScanButton?.addEventListener('click', async () => {
@@ -609,7 +817,7 @@ locateScanButton?.addEventListener('click', async () => {
             return;
         }
 
-        setLocationStatus(permissionState === 'prompt' ? 'Allow location when prompted.' : 'Locating...');
+        setLocationStatus(permissionState === 'prompt' ? `Allow location when prompted (+/- ${Math.round(MAX_DEVICE_LOCATION_ACCURACY_METERS)}m target).` : `Searching for precise GPS (+/- ${Math.round(MAX_DEVICE_LOCATION_ACCURACY_METERS)}m target)...`);
         attachScanLocation(await bestMobileLocation());
     } catch (error) {
         clearLocationInputs();
@@ -780,6 +988,7 @@ async function replayQueuedScans() {
 startButton?.addEventListener('click', startCamera);
 captureButton?.addEventListener('click', captureImage);
 input?.addEventListener('change', () => {
+    scanImagePreparedForSubmit = false;
     resetCaptureChecklistForNewImage();
 });
 checklistItems.forEach((item) => item.addEventListener('change', (event) => {
@@ -810,22 +1019,99 @@ scanForm?.addEventListener('submit', async (event) => {
         return;
     }
 
+    if (!scanImagePreparedForSubmit) {
+        event.preventDefault();
+        scanForm.classList.add('is-analyzing');
+        if (analyzeButton) {
+            analyzeButton.disabled = true;
+            analyzeButton.setAttribute('aria-busy', 'true');
+            analyzeButton.querySelector('.button-label').textContent = 'Preparing...';
+        }
+        startButton?.setAttribute('disabled', 'disabled');
+        captureButton?.setAttribute('disabled', 'disabled');
+
+        try {
+            await prepareScanImageForSubmit();
+            scanImagePreparedForSubmit = true;
+        } catch (error) {
+            scanForm.classList.remove('is-analyzing');
+            if (analyzeButton) {
+                analyzeButton.disabled = false;
+                analyzeButton.removeAttribute('aria-busy');
+            }
+            startButton?.removeAttribute('disabled');
+            captureButton?.removeAttribute('disabled');
+            updateCaptureChecklistState();
+            alert(error.message || 'The image could not be optimized. Please try another image.');
+            return;
+        }
+
+        if (!navigator.onLine) {
+            try {
+                await saveOfflineScan();
+                scanForm.reset();
+                scanImagePreparedForSubmit = false;
+                if (locationAccuracyInput) {
+                    locationAccuracyInput.value = '';
+                }
+                resetCaptureChecklistForNewImage();
+                setLocationStatus(preciseLocationRequiredMessage());
+                if (analyzeStatus) {
+                    analyzeStatus.hidden = false;
+                    analyzeStatus.textContent = 'Scan queued for upload when connection returns.';
+                }
+                scanForm.classList.remove('is-analyzing');
+                startButton?.removeAttribute('disabled');
+                captureButton?.removeAttribute('disabled');
+                updateCaptureChecklistState();
+                await updateOfflineQueueUi();
+            } catch (error) {
+                scanForm.classList.remove('is-analyzing');
+                if (analyzeButton) {
+                    analyzeButton.disabled = false;
+                    analyzeButton.removeAttribute('aria-busy');
+                }
+                startButton?.removeAttribute('disabled');
+                captureButton?.removeAttribute('disabled');
+                updateCaptureChecklistState();
+                alert(error.message || 'The scan could not be queued offline.');
+            }
+            return;
+        }
+
+        scanForm.requestSubmit();
+        return;
+    }
+
     if (!navigator.onLine) {
         event.preventDefault();
         try {
             await saveOfflineScan();
             scanForm.reset();
+            scanImagePreparedForSubmit = false;
             if (locationAccuracyInput) {
                 locationAccuracyInput.value = '';
             }
             resetCaptureChecklistForNewImage();
-            setLocationStatus('GPS required: use device location or GPS-tagged photo');
+            setLocationStatus(preciseLocationRequiredMessage());
             if (analyzeStatus) {
                 analyzeStatus.hidden = false;
                 analyzeStatus.textContent = 'Scan queued for upload when connection returns.';
             }
+            scanForm.classList.remove('is-analyzing');
+            startButton?.removeAttribute('disabled');
+            captureButton?.removeAttribute('disabled');
+            updateCaptureChecklistState();
             await updateOfflineQueueUi();
         } catch (error) {
+            scanForm.classList.remove('is-analyzing');
+            if (analyzeButton) {
+                analyzeButton.disabled = false;
+                analyzeButton.removeAttribute('aria-busy');
+            }
+            startButton?.removeAttribute('disabled');
+            captureButton?.removeAttribute('disabled');
+            updateCaptureChecklistState();
             alert(error.message || 'The scan could not be queued offline.');
         }
         return;
@@ -837,7 +1123,10 @@ scanForm?.addEventListener('submit', async (event) => {
         analyzeButton.setAttribute('aria-busy', 'true');
         analyzeButton.querySelector('.button-label').textContent = 'Analyzing...';
     }
-    if (analyzeStatus) analyzeStatus.hidden = false;
+    if (analyzeStatus) {
+        analyzeStatus.hidden = false;
+        analyzeStatus.textContent = 'Analyzing image with AI providers...';
+    }
     startButton?.setAttribute('disabled', 'disabled');
     captureButton?.setAttribute('disabled', 'disabled');
 });
@@ -966,11 +1255,18 @@ function renderRecognitionMap() {
             accuracy: point.accuracy === null || point.accuracy === undefined ? null : Number(point.accuracy),
         }))
         .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude));
+    const drawableRangeLayers = rangeLayers
+        .map((layer) => ({
+            ...layer,
+            regions: (layer.regions || []).filter((region) => isValidLeafletBounds(region.bounds)),
+        }))
+        .filter((layer) => layer.regions.length > 0);
+    const hasMapContent = validPoints.length > 0 || drawableRangeLayers.length > 0;
 
     const emptyState = mapGrid.querySelector('.map-empty-state');
-    emptyState?.toggleAttribute('hidden', validPoints.length > 0);
-    mapBoard.classList.toggle('is-empty', validPoints.length === 0);
-    if (validPoints.length === 0) return;
+    emptyState?.toggleAttribute('hidden', hasMapContent);
+    mapBoard.classList.toggle('is-empty', !hasMapContent);
+    if (!hasMapContent) return;
 
     if (recognitionLeafletMap) {
         recognitionLeafletMap.remove();
@@ -991,11 +1287,9 @@ function renderRecognitionMap() {
     const rangeBounds = [];
     let focusedMarker = null;
     let focusedLatLng = null;
-    rangeLayers.forEach((layer, layerIndex) => {
+    drawableRangeLayers.forEach((layer, layerIndex) => {
         const color = globalRangeColor(layerIndex);
-        (layer.regions || []).forEach((region) => {
-            if (!isValidLeafletBounds(region.bounds)) return;
-
+        layer.regions.forEach((region) => {
             L.rectangle(region.bounds, {
                 color,
                 weight: 1.6,
@@ -1013,15 +1307,14 @@ function renderRecognitionMap() {
 
     validPoints.forEach((point) => {
         const latLng = [point.latitude, point.longitude];
-        const level = ['high', 'moderate', 'low'].includes(point.level) ? point.level : 'unknown';
-        const color = markerColorForLevel(level);
+        const color = '#dc2626';
         const marker = L.marker(latLng, {
             icon: L.divIcon({
-                className: `crab-map-marker ${level}${point.focused ? ' is-focused' : ''}${point.ai_consensus?.reliable ? ' ai-verified' : ' ai-review'}`,
+                className: `crab-map-marker location-pin${point.focused ? ' is-focused' : ''}`,
                 html: '<span aria-hidden="true"></span>',
-                iconSize: [22, 22],
-                iconAnchor: [11, 11],
-                popupAnchor: [0, -13],
+                iconSize: [30, 40],
+                iconAnchor: [15, 38],
+                popupAnchor: [0, -34],
             }),
             title: point.species || 'Unknown crab',
         }).addTo(recognitionLeafletMap);
@@ -1055,21 +1348,13 @@ function renderRecognitionMap() {
             recognitionLeafletMap.setView(bounds[0], 15);
         }
     } else {
-        recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.16), { maxZoom: rangeBounds.length > 0 ? 8 : 16 });
+        recognitionLeafletMap.fitBounds(L.latLngBounds([...bounds, ...rangeBounds]).pad(0.16), { maxZoom: bounds.length > 0 ? (rangeBounds.length > 0 ? 8 : 16) : 5 });
     }
 
     mapGrid.classList.add('is-leaflet-ready');
     window.setTimeout(() => {
         recognitionLeafletMap?.invalidateSize();
-        focusedMarker?.openPopup();
     }, 80);
-}
-
-function markerColorForLevel(level) {
-    if (level === 'high') return '#0f766e';
-    if (level === 'moderate') return '#c2410c';
-    if (level === 'low') return '#b91c1c';
-    return '#2563eb';
 }
 
 function globalRangeColor(index) {
@@ -1101,6 +1386,19 @@ function buildRecognitionMapPopup(point) {
     const popup = document.createElement('article');
     popup.className = 'crab-map-popup';
 
+    if (point.image_url) {
+        const media = document.createElement('figure');
+        media.className = 'crab-map-popup-media';
+
+        const image = document.createElement('img');
+        image.src = point.image_url;
+        image.alt = `${point.species || 'Crab'} scan image`;
+        image.loading = 'lazy';
+
+        media.appendChild(image);
+        popup.appendChild(media);
+    }
+
     const title = document.createElement('h3');
     title.textContent = point.species || 'Unknown crab';
     popup.appendChild(title);
@@ -1108,6 +1406,7 @@ function buildRecognitionMapPopup(point) {
     appendPopupRow(popup, 'Scan', point.reference);
     appendPopupRow(popup, 'Confidence', point.confidence === null || point.confidence === undefined ? 'N/A' : `${point.confidence}% ${point.level || ''}`.trim());
     appendPopupRow(popup, 'Location', point.location || point.coordinates);
+    appendPopupRow(popup, 'Reliability', point.location_reliability);
     appendPopupRow(popup, 'GPS accuracy', formatLocationAccuracy(point.accuracy));
     if (point.global_range) {
         appendPopupRow(popup, 'Possible global range', point.global_range.label || point.global_range.range_text);

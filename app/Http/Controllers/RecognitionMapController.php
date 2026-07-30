@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CrabSpecies;
 use App\Models\RecognitionRecord;
 use App\Services\CrabRangeService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class RecognitionMapController extends Controller
@@ -30,9 +31,7 @@ class RecognitionMapController extends Controller
         $focusedRecord = null;
         if ($request->filled('scan')) {
             $focusedQuery = (clone $accessibleRecords)
-                ->with(['species', 'user'])
-                ->whereNotNull('latitude')
-                ->whereNotNull('longitude');
+                ->with(['species', 'user']);
 
             $scan = (string) $request->input('scan');
             $focusedRecord = $focusedQuery
@@ -46,32 +45,30 @@ class RecognitionMapController extends Controller
                 ->first();
         }
 
+        $rangeQuery = (clone $accessibleRecords)
+            ->with(['species', 'user'])
+            ->latest();
+        $this->applyFilters($rangeQuery, $request);
+
+        $matchingRecords = $rangeQuery->get();
+        if ($focusedRecord && ! $matchingRecords->contains(fn (RecognitionRecord $record) => $record->is($focusedRecord))) {
+            $matchingRecords->prepend($focusedRecord);
+        }
+
         $query = (clone $accessibleRecords)
             ->with(['species', 'user'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->latest();
-
-        if ($request->filled('species')) {
-            $query->where('crab_species_id', $request->species);
-        }
-        if ($request->filled('confidence')) {
-            $query->where('confidence_level', $request->confidence);
-        }
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
+        $this->applyFilters($query, $request);
 
         $filteredLocatedScans = (clone $query)->count();
         $records = $query->get();
-        if ($focusedRecord && ! $records->contains(fn (RecognitionRecord $record) => $record->is($focusedRecord))) {
+        if ($focusedRecord && $this->hasCoordinates($focusedRecord) && ! $records->contains(fn (RecognitionRecord $record) => $record->is($focusedRecord))) {
             $records->prepend($focusedRecord);
         }
         $sixProviderReliablePoints = $records->filter(fn (RecognitionRecord $record) => $this->isReliableConsensus($record))->count();
-        $rangeLayers = $records
+        $rangeLayers = $matchingRecords
             ->map(fn (RecognitionRecord $record) => $rangeService->forRecord($record))
             ->filter()
             ->unique('key')
@@ -87,6 +84,7 @@ class RecognitionMapController extends Controller
                 'filtered_points' => $filteredLocatedScans,
                 'six_provider_reliable_points' => $sixProviderReliablePoints,
                 'global_range_layers' => $rangeLayers->count(),
+                'range_source_scans' => $matchingRecords->count(),
                 'required_provider_count' => max(1, (int) config('services.ai.required_provider_count', 6)),
                 'minimum_provider_agreement' => max(1, (int) config('services.ai.min_provider_agreement', 4)),
                 'latest_located_at' => $latestLocatedRecord?->created_at,
@@ -102,8 +100,10 @@ class RecognitionMapController extends Controller
                 'latitude' => $record->latitude,
                 'longitude' => $record->longitude,
                 'accuracy' => $record->location_accuracy_meters === null ? null : round($record->location_accuracy_meters, 1),
+                'image_url' => $record->original_image_path ? route('recognition.image', $record) : null,
                 'location' => $record->location_label,
                 'coordinates' => number_format($record->latitude, 6).', '.number_format($record->longitude, 6),
+                'location_reliability' => $this->locationReliability($record),
                 'date' => $record->created_at->format('M d, Y g:i A'),
                 'captured_by' => $request->user()->isAdmin() ? $record->user?->name : null,
                 'status' => $record->recognition_status,
@@ -114,6 +114,50 @@ class RecognitionMapController extends Controller
                 'maps_url' => 'https://www.google.com/maps/search/?api=1&query='.rawurlencode(number_format($record->latitude, 7, '.', '').','.number_format($record->longitude, 7, '.', '')),
             ]),
         ]);
+    }
+
+    private function applyFilters(Builder $query, Request $request): void
+    {
+        if ($request->filled('species')) {
+            $query->where('crab_species_id', $request->species);
+        }
+        if ($request->filled('confidence')) {
+            $query->where('confidence_level', $request->confidence);
+        }
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+    }
+
+    private function hasCoordinates(RecognitionRecord $record): bool
+    {
+        return $record->latitude !== null && $record->longitude !== null;
+    }
+
+    private function locationReliability(RecognitionRecord $record): string
+    {
+        if (! $this->hasCoordinates($record)) {
+            return 'No exact GPS saved';
+        }
+
+        $accuracy = $record->location_accuracy_meters;
+        if ($accuracy === null) {
+            return 'Exact coordinates saved; accuracy radius unavailable';
+        }
+
+        if ($accuracy <= $this->maxDeviceAccuracyMeters()) {
+            return 'Reliable GPS within +/- '.number_format($accuracy, 0).' m';
+        }
+
+        return 'Low-accuracy legacy GPS (+/- '.number_format($accuracy, 0).' m)';
+    }
+
+    private function maxDeviceAccuracyMeters(): float
+    {
+        return max(1.0, (float) config('services.location.max_device_accuracy_meters', 100));
     }
 
     private function consensusSummary(RecognitionRecord $record): array

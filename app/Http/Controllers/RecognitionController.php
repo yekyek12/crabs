@@ -110,21 +110,45 @@ class RecognitionController extends Controller
     private function scanLocation(StoreRecognitionRequest $request, ImageLocationService $imageLocation): array
     {
         if ($request->filled('latitude') && $request->filled('longitude')) {
+            $accuracy = $request->filled('location_accuracy_meters')
+                ? round((float) $request->input('location_accuracy_meters'), 2)
+                : null;
+
+            if ($accuracy === null || $accuracy > $this->maxDeviceAccuracyMeters()) {
+                throw ValidationException::withMessages([
+                    'latitude' => 'GPS signal is too broad for a reliable scan location. Move outdoors, enable precise location, and try again.',
+                    'longitude' => 'GPS signal is too broad for a reliable scan location. Move outdoors, enable precise location, and try again.',
+                    'location_accuracy_meters' => 'GPS accuracy must be within '.number_format($this->maxDeviceAccuracyMeters(), 0).' meters.',
+                ]);
+            }
+
             return [
                 'latitude' => (float) $request->input('latitude'),
                 'longitude' => (float) $request->input('longitude'),
-                'accuracy' => $request->filled('location_accuracy_meters') ? round((float) $request->input('location_accuracy_meters'), 2) : null,
+                'accuracy' => $accuracy,
                 'label' => null,
             ];
         }
 
         $metadataLocation = $imageLocation->fromUploadedFile($request->file('image'));
         if ($metadataLocation !== null) {
+            if ($metadataLocation['accuracy'] !== null && (float) $metadataLocation['accuracy'] > $this->maxDeviceAccuracyMeters()) {
+                throw ValidationException::withMessages([
+                    'latitude' => 'Photo GPS metadata is too broad for a reliable scan location. Use live device location or a more precise GPS-tagged photo.',
+                    'longitude' => 'Photo GPS metadata is too broad for a reliable scan location. Use live device location or a more precise GPS-tagged photo.',
+                ]);
+            }
+
             return $metadataLocation;
         }
 
         throw ValidationException::withMessages([
             'latitude' => 'Attach device GPS location or upload a photo that contains GPS metadata before analysis.',
         ]);
+    }
+
+    private function maxDeviceAccuracyMeters(): float
+    {
+        return max(1.0, (float) config('services.location.max_device_accuracy_meters', 100));
     }
 }

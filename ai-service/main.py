@@ -12,6 +12,7 @@ MODEL_VERSION = os.getenv("AI_MODEL_VERSION", "placeholder-1.0.0")
 CONFIDENCE = float(os.getenv("AI_PLACEHOLDER_CONFIDENCE", "0.0"))
 MODEL_PATH = os.getenv("AI_MODEL_PATH", "")
 MODEL_CONFIDENCE_THRESHOLD = float(os.getenv("AI_MODEL_CONFIDENCE_THRESHOLD", "0.60"))
+IMAGE_MAX_EDGE = int(os.getenv("AI_IMAGE_MAX_EDGE", "1600"))
 CLASS_NAMES = [item.strip() for item in os.getenv("AI_MODEL_CLASSES", "").split(",") if item.strip()]
 MODEL_LOAD_ERROR = ""
 YOLO_MODEL = None
@@ -34,6 +35,15 @@ app = FastAPI(title="Crab Recognition AI Service", version="1.0.0")
 def require_token(authorization: Optional[str]) -> None:
     if APP_TOKEN and authorization != f"Bearer {APP_TOKEN}":
         raise HTTPException(status_code=401, detail="Invalid AI service token")
+
+
+def optimize_for_inference(picture: Image.Image) -> Image.Image:
+    if IMAGE_MAX_EDGE <= 0 or max(picture.size) <= IMAGE_MAX_EDGE:
+        return picture
+
+    optimized = picture.copy()
+    optimized.thumbnail((IMAGE_MAX_EDGE, IMAGE_MAX_EDGE), Image.Resampling.LANCZOS)
+    return optimized
 
 
 @app.get("/health")
@@ -85,6 +95,7 @@ async def predict(image: UploadFile = File(...), authorization: Optional[str] = 
     except Exception as exc:
         raise HTTPException(status_code=422, detail="Corrupt or unreadable image") from exc
 
+    picture = optimize_for_inference(picture)
     stat = ImageStat.Stat(picture.resize((1, 1)))
     brightness = round(sum(stat.mean) / 765, 4)
     warnings = []

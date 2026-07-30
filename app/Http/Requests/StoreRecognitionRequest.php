@@ -25,7 +25,7 @@ class StoreRecognitionRequest extends FormRequest
             'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp', 'max:8192', 'dimensions:min_width=320,min_height=240,max_width=6000,max_height=6000'],
             'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
-            'location_accuracy_meters' => ['nullable', 'numeric', 'between:0,100000'],
+            'location_accuracy_meters' => ['nullable', 'numeric', 'gt:0', 'lte:100000'],
             'location_label' => ['nullable', 'string', 'max:255'],
             'capture_notes' => ['nullable', 'string', 'max:1000'],
             'capture_checks' => ['required', 'array', 'size:'.count(self::CAPTURE_CHECKS)],
@@ -42,18 +42,51 @@ class StoreRecognitionRequest extends FormRequest
 
             $hasCoordinates = filled($this->input('latitude')) && filled($this->input('longitude'));
             if ($hasCoordinates) {
+                $accuracy = $this->input('location_accuracy_meters');
+                if (! filled($accuracy)) {
+                    $this->addLocationQualityError($validator, 'GPS accuracy is required for live device location. Tap Use Location again and wait for a precise fix.');
+
+                    return;
+                }
+
+                if ((float) $accuracy > $this->maxDeviceAccuracyMeters()) {
+                    $this->addLocationQualityError($validator, 'GPS signal is too broad for a reliable scan location. Move outdoors, enable precise location, and try again.');
+                }
+
                 return;
             }
 
             $image = $this->file('image');
-            $hasImageGps = $image instanceof \Illuminate\Http\UploadedFile
-                && app(ImageLocationService::class)->fromUploadedFile($image) !== null;
+            $imageGps = $image instanceof \Illuminate\Http\UploadedFile
+                ? app(ImageLocationService::class)->fromUploadedFile($image)
+                : null;
 
-            if (! $hasImageGps) {
+            if ($imageGps !== null) {
+                $accuracy = data_get($imageGps, 'accuracy');
+                if ($accuracy !== null && (float) $accuracy > $this->maxDeviceAccuracyMeters()) {
+                    $this->addLocationQualityError($validator, 'Photo GPS metadata is too broad for a reliable scan location. Use live device location or a more precise GPS-tagged photo.');
+                }
+
+                return;
+            }
+
+            if (! $imageGps) {
                 $message = 'Attach device GPS location or upload a photo that contains GPS metadata before analysis.';
                 $validator->errors()->add('latitude', $message);
                 $validator->errors()->add('longitude', $message);
             }
         });
+    }
+
+    private function maxDeviceAccuracyMeters(): float
+    {
+        return max(1.0, (float) config('services.location.max_device_accuracy_meters', 100));
+    }
+
+    private function addLocationQualityError(Validator $validator, string $message): void
+    {
+        $validator->errors()->add('latitude', $message);
+        $validator->errors()->add('longitude', $message);
+        $validator->errors()->add('location_accuracy_meters', $message);
     }
 }

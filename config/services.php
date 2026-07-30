@@ -77,4 +77,8 @@ return [
         ],
     ],
 
+    'location' => [
+        'max_device_accuracy_meters' => env('LOCATION_MAX_DEVICE_ACCURACY_METERS', 100),
+    ],
+
 ];

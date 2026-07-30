@@ -1,7 +1,8 @@
 @extends('layouts.app')
 @section('content')
 @php
-    $mapCountLabel = $focusedRecord ? 'Focused scan' : $mapStats['filtered_points'].' plotted';
+    $focusedHasGps = $focusedRecord && $focusedRecord->latitude !== null && $focusedRecord->longitude !== null;
+    $mapCountLabel = $focusedRecord ? ($focusedHasGps ? 'Focused scan' : 'Focused range') : $mapStats['filtered_points'].' plotted';
     $latestLocatedAt = $mapStats['latest_located_at'] ? $mapStats['latest_located_at']->format('M d, Y') : 'N/A';
 @endphp
 <section class="page-head feature-head map-head">
@@ -49,15 +50,15 @@
 
 <section class="map-board recognition-map-board" data-map-points='@json($points)' data-range-layers='@json($rangeLayers)'>
     <div class="map-board-head">
-        <span><i data-lucide="map-pin"></i>Located scans</span>
-        <strong>{{ $mapStats['filtered_points'] }}</strong>
+        <span><i data-lucide="globe-2"></i>GPS pins / global ranges</span>
+        <strong>{{ $mapStats['filtered_points'] }} / {{ $mapStats['global_range_layers'] }}</strong>
     </div>
     <div class="map-layer-legend">
         <span><b class="scan-pin-key"></b>Exact scan GPS</span>
         <span><b class="range-key"></b>Possible global range</span>
     </div>
     <div class="map-grid" id="recognitionMapGrid" aria-label="Recognition locations map">
-        <div class="map-empty-state">No scan locations match this filter.</div>
+        <div class="map-empty-state">No GPS points or known species ranges match this filter.</div>
     </div>
 </section>
 
@@ -74,7 +75,7 @@
             <small>{{ $record->confidence ? number_format($record->confidence * 100, 1).'%' : 'N/A' }} &middot; {{ $record->created_at->format('M d, Y') }}{{ $record->location_accuracy_meters ? ' &middot; +/- '.number_format($record->location_accuracy_meters, 0).' m' : '' }}</small>
         </a>
     @empty
-        <div class="empty map-empty-list">No located scans yet.</div>
+        <div class="empty map-empty-list">No exact GPS scan points match this filter. Species ranges can still appear on the map when range data is available.</div>
     @endforelse
 </div>
 @endsection

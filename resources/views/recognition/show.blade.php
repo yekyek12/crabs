@@ -35,6 +35,15 @@
     $hasCoordinates = $record->latitude !== null && $record->longitude !== null;
     $gpsCoordinates = $hasCoordinates ? number_format($record->latitude, 7, '.', '').','.number_format($record->longitude, 7, '.', '') : null;
     $gpsUrl = $gpsCoordinates ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($gpsCoordinates) : null;
+    $maxDeviceAccuracy = max(1, (float) config('services.location.max_device_accuracy_meters', 100));
+    $locationReliability = 'No exact GPS saved';
+    if ($hasCoordinates && $record->location_accuracy_meters === null) {
+        $locationReliability = 'Exact coordinates saved; accuracy radius unavailable';
+    } elseif ($hasCoordinates && $record->location_accuracy_meters <= $maxDeviceAccuracy) {
+        $locationReliability = 'Reliable GPS within +/- '.number_format($record->location_accuracy_meters, 0).' m';
+    } elseif ($hasCoordinates) {
+        $locationReliability = 'Low-accuracy legacy GPS (+/- '.number_format($record->location_accuracy_meters, 0).' m)';
+    }
 @endphp
 <section class="page-head app-page-head result-head"><div><p class="eyebrow">{{ $record->scan_reference }}</p><h1>{{ $resultName }}</h1></div><span class="badge"><i data-lucide="gauge"></i>{{ $record->confidence_level }}</span></section>
 <div class="result-media">
@@ -78,6 +87,7 @@
     <div class="result-field"><span>Expert correction</span><strong>{{ $record->expertSpecies?->common_name ?? ($record->needs_retraining ? 'Marked for retraining review' : 'No expert correction recorded.') }}</strong></div>
     <div class="result-field"><span>Location</span><strong>{{ $record->location_label ?: ($hasCoordinates ? $record->latitude.', '.$record->longitude : 'No location recorded.') }}</strong></div>
     @if($hasCoordinates)
+        <div class="result-field"><span>Location reliability</span><strong>{{ $locationReliability }}</strong></div>
         <div class="result-field"><span>Coordinates</span><strong>{{ number_format($record->latitude, 6) }}, {{ number_format($record->longitude, 6) }}{{ $record->location_accuracy_meters ? ' +/- '.number_format($record->location_accuracy_meters, 0).' m' : '' }}</strong></div>
         <div class="result-location-actions">
             <a class="button result-location-button" href="{{ route('recognition.map', ['scan' => $record->scan_reference]) }}">

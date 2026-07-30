@@ -9,7 +9,7 @@
     </div>
 </section>
 <canvas id="snapshot" hidden></canvas>
-<form id="scanForm" class="panel action-panel mobile-action-panel scan-action-card" method="post" action="{{ route('recognition.store') }}" enctype="multipart/form-data" autocomplete="off">@csrf
+<form id="scanForm" class="panel action-panel mobile-action-panel scan-action-card" method="post" action="{{ route('recognition.store') }}" enctype="multipart/form-data" autocomplete="off" data-max-location-accuracy="{{ max(1, (float) config('services.location.max_device_accuracy_meters', 100)) }}">@csrf
     <label class="upload-dropzone" for="imageInput"><i data-lucide="upload"></i><span><strong>Upload crab image</strong><small id="imageInputLabel">JPEG, PNG, or WEBP</small></span></label>
     <input id="imageInput" class="scan-file-input" name="image" type="file" accept="image/jpeg,image/png,image/webp" required>
     <input id="latitudeInput" name="latitude" type="hidden" value="{{ old('latitude') }}">
@@ -32,7 +32,7 @@
     </div>
     <div class="scan-assist-row">
         <button type="button" id="locateScan" class="button muted small"><i data-lucide="map-pin"></i>Use Location</button>
-        <span id="locationStatus" class="scan-assist-status">GPS required: use device location or GPS-tagged photo</span>
+        <span id="locationStatus" class="scan-assist-status">Precise GPS required: use location within {{ number_format(max(1, (float) config('services.location.max_device_accuracy_meters', 100)), 0) }}m or a GPS-tagged photo</span>
     </div>
     @foreach($errors->all() as $error)<p class="error">{{ $error }}</p>@endforeach
     <div class="actions"><button type="button" id="startCamera" class="button muted"><i data-lucide="camera"></i>Camera</button><button type="button" id="capture" class="button muted"><i data-lucide="sparkles"></i>Capture</button><button id="analyzeButton" class="button analyze-button" type="submit"><span class="button-spinner" aria-hidden="true"></span><i data-lucide="upload"></i><span class="button-label">Analyze Image</span></button></div>
